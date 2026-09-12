@@ -10,6 +10,17 @@ numpy>=1.26
 # before lifting this pin.
 scipy<1.18
 pandas>=2.2
+# NOTE: left unpinned above a floor deliberately -- Python 3.10 (this
+# project's Linux x86-64 target) tops out at scikit-learn 1.7.2, while
+# Windows ARM64 (the dev machine) only gets prebuilt wheels from 1.9.1
+# onward (which requires Python >=3.11). No single version satisfies both,
+# and HistGradientBoostingClassifier's internal loss module moved between
+# those two releases, so a model bundle trained under one cannot be
+# unpickled under the other (see models/bundle.py::ModelBundle.load and
+# docs/03_arquitetura.md, section 3.6). A bundle is only ever portable
+# across environments that resolve to the same scikit-learn version --
+# retrain locally with `python -m pdm.cli train` rather than copying a
+# bundle from an environment on a different Python version.
 scikit-learn>=1.5
 matplotlib>=3.8
 pyyaml>=6.0

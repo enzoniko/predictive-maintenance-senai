@@ -5,13 +5,16 @@ electric-motor asset: data audit, preprocessing, feature engineering
 (time / frequency / wavelet), model selection, robustness and
 explainability evaluation, and a served API + database + dashboard.
 
-**Result on the case dataset**: HistGradientBoosting (selected by cross-validation
-among 4 candidates) reaches **F1-macro = 0.961** on a held-out test split,
-with expected calibration error **0.005** and conformal-prediction coverage
-**0.890** against a 0.90 target (average prediction-set size 0.98). Two
-sanity controls confirm this is real signal, not leakage: label-shuffling
-collapses to F1 = 0.198 (chance = 0.20) and a model trained on the
-audit-excluded noise sensor alone scores F1 = 0.067 -- below chance. See
+**Result on the case dataset** (full run on the Linux x86-64 target, complete
+stack -- MLflow, real SHAP, ssqueezepy; see `docs/03_arquitetura.md` section
+3.7 for the cross-platform comparison table): HistGradientBoosting (selected
+by cross-validation among 4 candidates, on both platforms tested) reaches
+**F1-macro = 0.962** on a held-out test split, with expected calibration
+error **0.006** and conformal-prediction coverage **0.894** against a 0.90
+target (average prediction-set size 0.98). Two sanity controls confirm this
+is real signal, not leakage: label-shuffling lands at F1 = 0.200 (exactly
+chance) and a model trained on the audit-excluded noise sensor alone scores
+F1 = 0.067 -- below chance. See
 [`docs/01_interpretacao_problema.md`](docs/01_interpretacao_problema.md)
 for the full interpretation and [`notebooks/`](notebooks/) for the executed
 analysis behind these numbers.
@@ -75,10 +78,28 @@ on Windows ARM64, where no prebuilt wheels exist yet -- the code treats
 them as optional imports with a documented, tested fallback (a local
 JSON+joblib experiment tracker, permutation importance / LIME instead of
 SHAP, a plain-PyWavelets CWT instead of the synchrosqueezed transform, a
-joblib-pickled feature cache instead of Parquet), and all four are verified
-working on Linux x86-64. `scipy` is pinned to `<1.18` (no lower bound)
-because 1.18+ hits a DLL-load failure under a Windows Application Control
-Policy encountered during development.
+joblib-pickled feature cache instead of Parquet), and all four were run for
+real (not just installed) on Linux x86-64 -- see `docs/03_arquitetura.md`
+section 3.7 for that full training run's results, logged to a real MLflow
+tracker. `scipy` is pinned to `<1.18` (no lower bound) because 1.18+ hits a
+DLL-load failure under a Windows Application Control Policy encountered
+during development.
+
+A model bundle is only portable across environments that resolve the same
+scikit-learn version: Python 3.10 tops out at scikit-learn 1.7.2, while
+Windows ARM64 only gets wheels from 1.9.1 onward (which needs Python
+>=3.11), and `HistGradientBoostingClassifier`'s internal loss module moved
+between those releases -- a genuinely different-Python-version issue, not a
+Windows-vs-Linux one. `requirements.txt` documents this; `ModelBundle.load()`
+(`src/pdm/models/bundle.py`) turns the resulting pickle failure into an
+actionable error instead of a bare traceback. The bundle committed to this
+repo is the one this development environment can load; `docs/03_arquitetura.md`
+section 3.7 reports both platforms' numbers side by side.
+
+Docker Compose was reviewed and its dependencies confirmed installable on
+the Linux target, but `docker compose up` itself was not run end-to-end
+there: the test server's Docker daemon requires `sudo`, which needs a
+password not available in this session.
 
 ## License
 
