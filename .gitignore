@@ -1,0 +1,43 @@
+# Data (downloaded via scripts/download_data.py)
+data/raw/
+data/processed/
+*.npy
+*.npz
+*.parquet
+
+# Generated reports (regenerate with `python -m pdm.cli audit`); a curated
+# snapshot is committed separately under docs/ for the deliverable.
+docs/reports/
+
+# Experiment tracking / artifacts
+mlruns/
+mlartifacts/
+optuna.db
+*.sqlite
+*.db
+!models/artifacts/**
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+
+# Deliverables assembled outside the repo
+deliverables/

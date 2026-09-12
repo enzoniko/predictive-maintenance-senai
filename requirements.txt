@@ -1,0 +1,49 @@
+# Core scientific stack
+numpy>=1.26
+# NOTE: scipy>=1.18 hits a DLL-load failure on some Windows boxes because a
+# local Application Control Policy blocks scipy.stats._levy_stable's compiled
+# extension (reproduced on Windows ARM64 / Python 3.12; confirmed absent with
+# scipy 1.16.3 and 1.17.1). The upper bound alone (no lower bound) lets pip
+# resolve the newest compatible release per interpreter -- e.g. 1.15.x on
+# Python 3.10, 1.17.x on Python 3.12 -- verified on both Windows ARM64
+# (Python 3.12) and Linux x86-64 (Python 3.10, niko-g3-3579). Re-validate
+# before lifting this pin.
+scipy<1.18
+pandas>=2.2
+scikit-learn>=1.5
+matplotlib>=3.8
+pyyaml>=6.0
+joblib>=1.4
+typer>=0.12
+
+# Signal processing
+PyWavelets>=1.6
+
+# Modeling (optional / platform-dependent, see src/pdm/*/optional_imports.py)
+xgboost>=2.0
+optuna>=3.6
+mlflow>=2.14
+shap>=0.45
+lime>=0.2.0.1
+# ssqueezepy pulls in numba/llvmlite, which may lack prebuilt wheels on some
+# platforms (observed: Windows ARM64). Code falls back to PyWavelets CWT when
+# unavailable -- see src/pdm/features/wavelet.py.
+ssqueezepy>=0.6.5
+
+# Serving
+fastapi>=0.111
+uvicorn[standard]>=0.30
+pydantic>=2.7
+sqlalchemy>=2.0
+streamlit>=1.36
+requests>=2.32
+
+# Data acquisition & document generation
+gdown>=5.2
+python-docx>=1.1
+python-pptx>=0.6.23
+
+# Dev / test
+pytest>=8.2
+nbclient>=0.10
+nbformat>=5.10

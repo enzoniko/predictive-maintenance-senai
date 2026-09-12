@@ -1,0 +1,77 @@
+# Default configuration for the predictive-maintenance pipeline.
+# All paths are relative to the repository root and resolved with pathlib,
+# so this file works unchanged on Windows and Linux.
+
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  models_dir: "models/artifacts"
+  figures_dir: "docs/figures"
+  reports_dir: "docs/reports"
+
+  sensor_files:
+    - "Dados_1.npy"
+    - "Dados_2.npy"
+    - "Dados_3.npy"
+    - "Dados_4.npy"
+    - "Dados_5.npy"
+  labels_file: "Classes.npy"
+
+acquisition:
+  sample_rate_hz: 10000
+  window_length_samples: 200 # 20 ms per window; the 201st column in
+  # Dados_1-3 is a near-empty artifact column (see docs/07_perguntas_ao_cliente.md)
+  # and is dropped by the loader, not treated as data.
+  expected_columns_min: 200
+  expected_columns_max: 201
+
+random_seed: 42
+
+split:
+  train: 0.8
+  calibration: 0.1
+  test: 0.1
+  stratify: true
+
+cross_validation:
+  n_splits: 5
+  shuffle: true
+
+sensor_screening:
+  # Statistical thresholds used by preprocessing/sensor_screening.py to decide
+  # whether a channel carries information worth feeding to the models.
+  min_unique_ratio: 0.05 # flags a channel as "stuck" if too few distinct values
+  alpha: 0.01 # significance level for Kruskal-Wallis / permutation tests
+  whiteness_autocorr_lag1_max: 0.15 # |autocorr| below this -> looks like white noise
+  # Smallest achievable p-value is 1/(n+1); must clear alpha with headroom.
+  permutation_n_repeats: 199
+
+cleaning:
+  saturation_abs_threshold: 5.0 # ADC full-scale observed in Dados_1-3
+  hampel_window: 7
+  hampel_n_sigmas: 3.0
+  silent_window_std_percentile: 2.0
+
+conformal:
+  method: "aps" # adaptive prediction sets
+  target_coverage: 0.90
+
+drift:
+  method: "psi"
+  psi_alarm_threshold: 0.2
+
+imbalance:
+  # Realistic operating prior used to re-weight the held-out test set when
+  # reporting metrics -- the 50/50/50/50/50 split in the case data is curated,
+  # not representative of a real fleet where healthy operation dominates.
+  simulated_prior:
+    "Classe A": 0.70
+    "Classe B": 0.10
+    "Classe C": 0.08
+    "Classe D": 0.07
+    "Classe E": 0.05
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  database_url: "sqlite:///./pdm.db"
