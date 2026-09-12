@@ -1,0 +1,41 @@
+# Per-sensor physical metadata. UNKNOWN for every field below because the
+# case package does not identify the transducer type, its sensitivity, or
+# the conditioning electronics' gain/offset -- see
+# docs/07_perguntas_ao_cliente.md, question set "DADOS". Until the client
+# supplies these, the pipeline works entirely in raw volts and never claims
+# an engineering unit (g, mm/s, A, ...) it cannot justify.
+#
+# Once known, fill in a block like this per retained sensor and
+# preprocessing/dsp.py's UnitConverter will apply it:
+#
+#   Dados_1:
+#     quantity: acceleration        # acceleration | velocity | current | voltage | temperature
+#     sensitivity: 100.0            # mV per physical unit (e.g. mV/g for an IEPE accelerometer)
+#     sensitivity_unit: "mV/g"
+#     conditioner_gain: 1.0
+#     conditioner_offset_v: 0.0
+#     adc_full_scale_v: 5.0         # matches the +/-5.0 saturation observed in the raw data
+
+Dados_1:
+  quantity: unknown
+  sensitivity: null
+  sensitivity_unit: null
+  conditioner_gain: 1.0
+  conditioner_offset_v: 0.0
+  adc_full_scale_v: 5.0
+
+Dados_2:
+  quantity: unknown
+  sensitivity: null
+  sensitivity_unit: null
+  conditioner_gain: 1.0
+  conditioner_offset_v: 0.0
+  adc_full_scale_v: 5.0
+
+Dados_3:
+  quantity: unknown
+  sensitivity: null
+  sensitivity_unit: null
+  conditioner_gain: 1.0
+  conditioner_offset_v: 0.0
+  adc_full_scale_v: 5.0
