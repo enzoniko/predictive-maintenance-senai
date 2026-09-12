@@ -7,6 +7,7 @@ Linux -- no hardcoded separators anywhere in this package.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -56,6 +57,13 @@ def load_config(path: str | Path | None = None) -> Config:
     cfg_path = Path(path) if path is not None else DEFAULT_CONFIG_PATH
     with cfg_path.open(encoding="utf-8") as fh:
         raw = yaml.safe_load(fh)
+
+    # PDM_DATABASE_URL overrides configs/default.yaml's api.database_url --
+    # used by docker/docker-compose.yml to point the containerized API at
+    # Postgres instead of the SQLite default, without a separate config file.
+    env_database_url = os.environ.get("PDM_DATABASE_URL")
+    if env_database_url:
+        raw["api"]["database_url"] = env_database_url
 
     p = raw["paths"]
     paths = Paths(

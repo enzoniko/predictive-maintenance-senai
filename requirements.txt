@@ -47,3 +47,12 @@ python-pptx>=0.6.23
 pytest>=8.2
 nbclient>=0.10
 nbformat>=5.10
+
+# NOTE: the Postgres driver (psycopg2-binary) is intentionally NOT listed
+# here. It needs pg_config/a C toolchain to build from source and has no
+# prebuilt wheel for Windows ARM64 -- it would break `pip install -r
+# requirements.txt` on this dev machine for a feature (docker-compose's
+# Postgres backend) that machine will never use. It installs cleanly on
+# Linux x86-64 (confirmed on the test server) and is added directly in
+# docker/Dockerfile.api, which only ever runs there. Local development
+# uses the SQLite default in configs/default.yaml.

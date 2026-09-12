@@ -1,0 +1,23 @@
+# Linux x86-64 image -- this is the deployment target (see README.md,
+# "Platform notes"): mlflow/streamlit/shap/ssqueezepy all install cleanly
+# here via prebuilt wheels, unlike on the Windows ARM64 dev machine.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt pyproject.toml ./
+RUN pip install --no-cache-dir -r requirements.txt \
+    # Postgres driver: deliberately not in requirements.txt -- see the note
+    # at the bottom of that file for why.
+    && pip install --no-cache-dir psycopg2-binary
+
+COPY src/ src/
+COPY configs/ configs/
+RUN pip install --no-cache-dir -e .
+
+# Populated by the training pipeline (`python -m pdm.cli train`) before the
+# image is built, or mounted at runtime -- see docker-compose.yml.
+COPY models/ models/
+
+EXPOSE 8000
+CMD ["uvicorn", "pdm.serving.api:app", "--host", "0.0.0.0", "--port", "8000"]
