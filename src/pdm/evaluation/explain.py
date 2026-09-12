@@ -45,6 +45,36 @@ def permutation_importance_report(
     )
 
 
+def _aggregate_shap_values(shap_values) -> np.ndarray:
+    """Reduce a TreeExplainer's ``shap_values`` output to one mean-|value|
+    per feature, regardless of which of the three shapes SHAP hands back --
+    kept as its own pure function (no shap import needed to exercise it) so
+    it can be unit-tested without the library installed, which matters
+    because it was never exercised at all on the one platform where SHAP is
+    actually importable (see docs/03_arquitetura.md, section 3.6: shap
+    fails to build on this project's Windows ARM64 dev machine). Running
+    for real on the Linux x86-64 test server surfaced the bug this function
+    fixes: multi-class TreeExplainer output changed, across SHAP versions,
+    from a list of one (n_samples, n_features) array per class to a single
+    (n_samples, n_features, n_classes) array -- code written only against
+    the list form silently produced a 2-D "mean" (features x classes)
+    instead of a 1-D per-feature vector, which crashed one level up when
+    that got zipped into a DataFrame column.
+
+    - list of 2-D arrays (older multi-class API): one array per class.
+    - a single 3-D array, shape (n_samples, n_features, n_classes): newer
+      multi-class API.
+    - a single 2-D array, shape (n_samples, n_features): binary/regression.
+    """
+    if isinstance(shap_values, list):
+        stacked = np.stack([np.abs(v) for v in shap_values], axis=0)
+        return stacked.mean(axis=(0, 1))
+    values = np.asarray(shap_values)
+    if values.ndim == 3:
+        return np.abs(values).mean(axis=(0, 2))
+    return np.abs(values).mean(axis=0)
+
+
 def shap_global_importance(
     model, X: pd.DataFrame, sample_size: int = 2000, seed: int = 42
 ) -> pd.DataFrame | None:
@@ -55,13 +85,7 @@ def shap_global_importance(
     X_sample = X.sample(n=min(sample_size, len(X)), random_state=seed)
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_sample)
-    # Multi-class tree explainers return a list of (n, n_features) arrays,
-    # one per class -- average |value| across classes for a single ranking.
-    if isinstance(shap_values, list):
-        stacked = np.stack([np.abs(v) for v in shap_values], axis=0)
-        mean_abs = stacked.mean(axis=(0, 1))
-    else:
-        mean_abs = np.abs(shap_values).mean(axis=0)
+    mean_abs = _aggregate_shap_values(shap_values)
     return (
         pd.DataFrame({"feature": X.columns, "mean_abs_shap": mean_abs})
         .sort_values("mean_abs_shap", ascending=False)

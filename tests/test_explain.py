@@ -6,6 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 from pdm.evaluation.explain import (
     SHAP_AVAILABLE,
+    _aggregate_shap_values,
     lime_explain_instance,
     permutation_importance_report,
     shap_global_importance,
@@ -47,3 +48,36 @@ def test_lime_explains_a_single_instance() -> None:
     explanation = lime_explain_instance(model, X, X.iloc[0], class_names=CLASSES, num_features=2)
     as_list = explanation.as_list(label=explanation.available_labels()[0])
     assert len(as_list) == 2
+
+
+def test_aggregate_shap_values_handles_list_of_per_class_arrays() -> None:
+    # Older SHAP API for multi-class TreeExplainer: one (n_samples,
+    # n_features) array per class.
+    rng = np.random.default_rng(0)
+    per_class = [rng.normal(size=(50, 4)) for _ in range(3)]
+    result = _aggregate_shap_values(per_class)
+    assert result.shape == (4,)
+    expected = np.mean([np.abs(a) for a in per_class], axis=(0, 1))
+    assert np.allclose(result, expected)
+
+
+def test_aggregate_shap_values_handles_3d_array() -> None:
+    # Newer SHAP API for multi-class TreeExplainer: a single
+    # (n_samples, n_features, n_classes) array -- this shape is exactly
+    # what broke shap_global_importance on the Linux x86-64 test server
+    # (SHAP is unavailable on the Windows ARM64 dev machine, so this path
+    # was never exercised there; see docs/03_arquitetura.md, section 3.6).
+    rng = np.random.default_rng(0)
+    values = rng.normal(size=(50, 4, 3))
+    result = _aggregate_shap_values(values)
+    assert result.shape == (4,)
+    assert np.allclose(result, np.abs(values).mean(axis=(0, 2)))
+
+
+def test_aggregate_shap_values_handles_2d_array() -> None:
+    # Binary classification / regression: a single (n_samples, n_features) array.
+    rng = np.random.default_rng(0)
+    values = rng.normal(size=(50, 4))
+    result = _aggregate_shap_values(values)
+    assert result.shape == (4,)
+    assert np.allclose(result, np.abs(values).mean(axis=0))

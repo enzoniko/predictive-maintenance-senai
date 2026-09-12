@@ -2,3 +2,12 @@
 ruff>=0.5
 ipykernel>=6.29
 jupyterlab>=4.2
+# starlette.testclient (used by tests/test_api.py) needs one of httpx/httpx2
+# present -- which one varies by platform/version resolution: on this
+# Windows ARM64 dev machine httpx is already pulled in transitively and
+# testclient only warns that httpx2 is preferred, but a from-scratch Linux
+# x86-64 install (the test server) had neither and hit a hard RuntimeError
+# instead. Pinning httpx2 explicitly here (a dev/test-only need, not a
+# runtime dependency of the API itself) makes the test suite installable
+# the same way on both platforms.
+httpx2>=0.1

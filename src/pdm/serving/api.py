@@ -148,9 +148,9 @@ def audit() -> AuditSummaryResponse:
     )
 
 
-@app.post("/predict", response_model=PredictResponse)
-def predict(request: PredictRequest) -> PredictResponse:
-    predicted_class, proba_by_class, conformal_set, is_silent, feature_values = _predict_one(request.sensors)
+def _predict_and_build_record(sensors: dict[str, list[float]]) -> tuple[PredictResponse, db.PredictionRecord]:
+    bundle = _bundle()
+    predicted_class, proba_by_class, conformal_set, is_silent, feature_values = _predict_one(sensors)
 
     warnings = []
     if is_silent:
@@ -163,33 +163,56 @@ def predict(request: PredictRequest) -> PredictResponse:
     elif len(conformal_set) == 0:
         warnings.append("conformal set is empty: this window does not resemble any trained class")
 
-    bundle = _bundle()
-    with state["session_factory"]() as session:
-        session.add(
-            db.PredictionRecord(
-                model_name=bundle.model_name,
-                predicted_class=predicted_class,
-                probabilities=proba_by_class,
-                conformal_set=conformal_set,
-                is_silent=is_silent,
-                sensor_names=bundle.sensor_names,
-                features=dict(zip(bundle.feature_columns, (float(v) for v in feature_values))),
-            )
-        )
-        session.commit()
-
-    return PredictResponse(
+    response = PredictResponse(
         predicted_class=predicted_class,
         probabilities=proba_by_class,
         conformal_set=conformal_set,
         is_silent=is_silent,
         warnings=warnings,
     )
+    record = db.PredictionRecord(
+        model_name=bundle.model_name,
+        predicted_class=predicted_class,
+        probabilities=proba_by_class,
+        conformal_set=conformal_set,
+        is_silent=is_silent,
+        sensor_names=bundle.sensor_names,
+        features=dict(zip(bundle.feature_columns, (float(v) for v in feature_values))),
+    )
+    return response, record
+
+
+@app.post("/predict", response_model=PredictResponse)
+def predict(request: PredictRequest) -> PredictResponse:
+    response, record = _predict_and_build_record(request.sensors)
+    with state["session_factory"]() as session:
+        session.add(record)
+        session.commit()
+    return response
 
 
 @app.post("/predict_batch", response_model=list[PredictResponse])
 def predict_batch(request: PredictBatchRequest) -> list[PredictResponse]:
-    return [predict(window) for window in request.windows]
+    """Scores every window and persists all of them in a single transaction.
+
+    Calling POST /predict in a loop from a client -- as notebooks/03's demo
+    originally did to generate a batch of production traffic for GET /drift
+    -- means one HTTP round trip *and* one fsync'd DB commit per window;
+    at a couple hundred windows that took over 10 minutes end to end and
+    is what actually motivated this endpoint's batching to be real instead
+    of just a thin loop over ``predict()``, which is what it was before.
+    """
+    responses, records = [], []
+    for window in request.windows:
+        response, record = _predict_and_build_record(window.sensors)
+        responses.append(response)
+        records.append(record)
+
+    with state["session_factory"]() as session:
+        session.add_all(records)
+        session.commit()
+
+    return responses
 
 
 @app.post("/explain", response_model=ExplainResponse)
@@ -254,7 +277,15 @@ def explain(request: PredictRequest) -> ExplainResponse:
     )
 
 
-MIN_PRODUCTION_SAMPLES_FOR_DRIFT = 30
+# PSI (evaluation/drift.py) bins the reference into deciles by default;
+# with too few current-batch samples per bin, sampling noise alone produces
+# large PSI values and floods the report with false alarms -- observed
+# directly running notebooks/03_api_demo.ipynb with ~40 samples drawn from
+# the *same* distribution as the reference (no real drift possible) and
+# still getting 143/176 features flagged. 200 keeps roughly 20+ samples per
+# decile bin, which is a more defensible floor; still a coarse rule of
+# thumb, not a substitute for reviewing a real production drift report.
+MIN_PRODUCTION_SAMPLES_FOR_DRIFT = 200
 
 
 @app.post("/drift/reference/reload")
