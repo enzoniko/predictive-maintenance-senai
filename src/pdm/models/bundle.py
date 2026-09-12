@@ -9,17 +9,34 @@ consistent, versioned unit.
 
 from __future__ import annotations
 
+import platform
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import joblib
+import sklearn
 
 from pdm.evaluation.conformal import SplitConformalClassifier
 from pdm.preprocessing.cleaning import SensorCleaner
 
 BUNDLE_FILENAME = "model_bundle.joblib"
+
+
+def _current_environment() -> dict[str, str]:
+    try:
+        import xgboost
+
+        xgboost_version = xgboost.__version__
+    except ImportError:
+        xgboost_version = "unavailable"
+    return {
+        "python_version": platform.python_version(),
+        "sklearn_version": sklearn.__version__,
+        "xgboost_version": xgboost_version,
+        "platform": platform.platform(),
+    }
 
 
 @dataclass
@@ -38,6 +55,12 @@ class ModelBundle:
     cleaners: dict[str, SensorCleaner] = field(default_factory=dict)
     metrics: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    # Recorded at save() time so a failed load() -- see the note there about
+    # cross-version pickle incompatibility -- can at least be diagnosed
+    # after the fact by comparing against a *successfully* loaded sibling
+    # bundle, even though the failing load itself can't read this field
+    # (the unpickling dies on the model object before reaching it).
+    environment: dict[str, str] = field(default_factory=_current_environment)
 
     def save(self, path: Path) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -52,7 +75,28 @@ class ModelBundle:
 
     @staticmethod
     def load(path: Path) -> ModelBundle:
-        bundle = joblib.load(path)
+        try:
+            bundle = joblib.load(path)
+        except (ModuleNotFoundError, AttributeError, ImportError) as exc:
+            # Concretely reproduced across this project's own two training
+            # environments: a bundle trained under scikit-learn 1.9.1
+            # (Python 3.12, Windows ARM64 -- the only sklearn release with
+            # ARM64 Windows wheels at the time) fails with "No module named
+            # '_loss'" when loaded under scikit-learn 1.7.2 (Python 3.10,
+            # the newest sklearn compatible with that interpreter, on the
+            # Linux x86-64 deployment target) -- HistGradientBoosting's
+            # internal loss module moved between those releases. This is a
+            # Python-version-driven scikit-learn compatibility gap, not a
+            # Windows-vs-Linux one; see docs/03_arquitetura.md, section 3.6.
+            here = _current_environment()
+            raise RuntimeError(
+                f"Could not load the model bundle at {path}: {exc}\n"
+                "This usually means it was pickled under a different "
+                "scikit-learn/Python combination than this environment "
+                f"provides. This environment: Python {here['python_version']}, "
+                f"scikit-learn {here['sklearn_version']}. Retrain a bundle "
+                "that matches this environment with `python -m pdm.cli train`."
+            ) from exc
         if not isinstance(bundle, ModelBundle):
             raise TypeError(f"{path} does not contain a ModelBundle")
         return bundle
