@@ -115,7 +115,9 @@ class SplitConformalClassifier:
         self._calib_rng = np.random.default_rng(random_state)
         self._predict_rng = np.random.default_rng(random_state + 1)
 
-    def calibrate(self, proba_calib: np.ndarray, y_calib: np.ndarray, target_coverage: float = 0.9) -> ConformalCalibrationSummary:
+    def calibrate(
+        self, proba_calib: np.ndarray, y_calib: np.ndarray, target_coverage: float = 0.9
+    ) -> ConformalCalibrationSummary:
         y_idx = np.array([self.class_index[label] for label in y_calib])
         if self.method == "aps":
             scores = _aps_scores(proba_calib, y_idx, self._calib_rng)

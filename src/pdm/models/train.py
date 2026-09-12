@@ -153,7 +153,7 @@ class EncodedLabelClassifier:
         # which is exactly what this reconstructs.
         self.classes_ = np.array([self.inverse_mapping[i] for i in range(len(mapping))])
 
-    def fit(self, X: pd.DataFrame, y: np.ndarray) -> "EncodedLabelClassifier":
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> EncodedLabelClassifier:
         y_encoded = np.array([self.mapping[label] for label in y])
         self.estimator.fit(X, y_encoded)
         return self

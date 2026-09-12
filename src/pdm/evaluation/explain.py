@@ -45,7 +45,9 @@ def permutation_importance_report(
     )
 
 
-def shap_global_importance(model, X: pd.DataFrame, sample_size: int = 2000, seed: int = 42) -> pd.DataFrame | None:
+def shap_global_importance(
+    model, X: pd.DataFrame, sample_size: int = 2000, seed: int = 42
+) -> pd.DataFrame | None:
     """Mean |SHAP value| per feature, using TreeExplainer (fast, exact for
     tree ensembles). Returns None if shap is not importable."""
     if not SHAP_AVAILABLE:

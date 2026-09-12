@@ -100,7 +100,10 @@ with col2:
         else:
             st.metric("Predicted class", result["predicted_class"])
             proba_df = pd.DataFrame(
-                {"class": list(result["probabilities"]), "probability": list(result["probabilities"].values())}
+                {
+                    "class": list(result["probabilities"]),
+                    "probability": list(result["probabilities"].values()),
+                }
             ).sort_values("probability", ascending=False)
             st.bar_chart(proba_df.set_index("class"))
 

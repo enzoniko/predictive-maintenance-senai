@@ -17,7 +17,11 @@ from sklearn.metrics import classification_report, confusion_matrix
 
 def confusion_matrix_df(y_true: np.ndarray, y_pred: np.ndarray, labels: list[str]) -> pd.DataFrame:
     cm = confusion_matrix(y_true, y_pred, labels=labels)
-    return pd.DataFrame(cm, index=[f"true_{l}" for l in labels], columns=[f"pred_{l}" for l in labels])
+    return pd.DataFrame(
+        cm,
+        index=[f"true_{lbl}" for lbl in labels],
+        columns=[f"pred_{lbl}" for lbl in labels],
+    )
 
 
 def full_classification_report(y_true: np.ndarray, y_pred: np.ndarray, labels: list[str]) -> dict:
@@ -56,5 +60,8 @@ def evaluate_calibration(
             bin_accuracy[b] = correct[mask].mean()
 
     total = bin_count.sum()
-    ece = float(np.sum(bin_count * np.abs(bin_accuracy - bin_confidence)) / total) if total > 0 else float("nan")
+    if total > 0:
+        ece = float(np.sum(bin_count * np.abs(bin_accuracy - bin_confidence)) / total)
+    else:
+        ece = float("nan")
     return CalibrationResult(bin_confidence, bin_accuracy, bin_count, ece)

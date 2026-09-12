@@ -45,7 +45,7 @@ class ModelBundle:
         return path
 
     @staticmethod
-    def load(path: Path) -> "ModelBundle":
+    def load(path: Path) -> ModelBundle:
         bundle = joblib.load(path)
         if not isinstance(bundle, ModelBundle):
             raise TypeError(f"{path} does not contain a ModelBundle")

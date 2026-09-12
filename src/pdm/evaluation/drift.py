@@ -68,7 +68,7 @@ class DriftMonitor:
         self.n_bins = n_bins
         self.reference_: pd.DataFrame | None = None
 
-    def fit(self, reference: pd.DataFrame) -> "DriftMonitor":
+    def fit(self, reference: pd.DataFrame) -> DriftMonitor:
         self.reference_ = reference.copy()
         return self
 

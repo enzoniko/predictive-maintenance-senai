@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException
 
 from pdm.config import load_config
 from pdm.evaluation.drift import DriftMonitor
-from pdm.evaluation.explain import SHAP_AVAILABLE, shap_global_importance
+from pdm.evaluation.explain import SHAP_AVAILABLE
 from pdm.features.builder import build_features_from_raw
 from pdm.models.bundle import BUNDLE_FILENAME, ModelBundle
 from pdm.serving import db
@@ -60,7 +60,9 @@ def _bundle() -> ModelBundle:
     return state["bundle"]
 
 
-def _predict_one(sensors: dict[str, list[float]]) -> tuple[str, dict[str, float], list[str], bool, np.ndarray]:
+def _predict_one(
+    sensors: dict[str, list[float]],
+) -> tuple[str, dict[str, float], list[str], bool, np.ndarray]:
     bundle = _bundle()
     missing = [s for s in bundle.sensor_names if s not in sensors]
     if missing:
@@ -206,7 +208,9 @@ def explain(request: PredictRequest) -> ExplainResponse:
     top_features = [
         {"feature": bundle.feature_columns[i], "importance": float(importances[i])} for i in order
     ]
-    return ExplainResponse(predicted_class=predicted_class, top_features=top_features, method="feature_importances")
+    return ExplainResponse(
+        predicted_class=predicted_class, top_features=top_features, method="feature_importances"
+    )
 
 
 @app.get("/drift", response_model=DriftSummaryResponse)

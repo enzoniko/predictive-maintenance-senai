@@ -15,8 +15,7 @@ import numpy as np
 import optuna
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.model_selection import StratifiedKFold, cross_val_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 
 from pdm.models.train import XGBOOST_AVAILABLE, label_mapping
 
@@ -93,5 +92,7 @@ def tune_xgboost(
     y_encoded = np.array([mapping[label] for label in y_sub])
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
     study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=seed))
-    study.optimize(lambda t: _xgb_objective(t, X_sub, y_encoded, cv), n_trials=n_trials, show_progress_bar=False)
+    study.optimize(
+        lambda t: _xgb_objective(t, X_sub, y_encoded, cv), n_trials=n_trials, show_progress_bar=False
+    )
     return TuningResult("xgboost", study.best_params, study.best_value, n_trials)

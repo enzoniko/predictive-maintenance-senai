@@ -67,7 +67,9 @@ def load_labels(labels_path: Path) -> np.ndarray:
     return labels
 
 
-def _split_ghost_column(name: str, matrix: np.ndarray, expected_len: int) -> tuple[np.ndarray, np.ndarray | None]:
+def _split_ghost_column(
+    name: str, matrix: np.ndarray, expected_len: int
+) -> tuple[np.ndarray, np.ndarray | None]:
     """Validate and drop a trailing ghost column beyond ``expected_len``.
 
     Returns (clean_matrix, ghost_column_or_None). Raises SchemaError if the

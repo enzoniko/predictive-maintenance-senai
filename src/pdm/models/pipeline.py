@@ -12,7 +12,6 @@ schedule's phases 1-3.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -39,7 +38,13 @@ from pdm.evaluation.robustness import (
 )
 from pdm.features.builder import build_features_from_raw, fit_cleaners
 from pdm.models.bundle import ModelBundle
-from pdm.models.train import CVResult, cross_validate_models, feature_columns, fit_final_model, get_candidate_models
+from pdm.models.train import (
+    CVResult,
+    cross_validate_models,
+    feature_columns,
+    fit_final_model,
+    get_candidate_models,
+)
 
 
 @dataclass
@@ -116,7 +121,9 @@ def run_training_pipeline(config: Config, dataset: SensorDataset | None = None) 
     X_train, X_calib, X_test = train_table[cols], calib_table[cols], test_table[cols]
 
     models = get_candidate_models(seed)
-    cv_results = cross_validate_models(X_train, y_train, models, n_splits=config.cross_validation["n_splits"], seed=seed)
+    cv_results = cross_validate_models(
+        X_train, y_train, models, n_splits=config.cross_validation["n_splits"], seed=seed
+    )
     best = max(cv_results, key=lambda r: r.mean_f1_macro)
     best_model = fit_final_model(models[best.model_name], X_train, y_train, model_name=best.model_name)
 
@@ -136,7 +143,9 @@ def run_training_pipeline(config: Config, dataset: SensorDataset | None = None) 
         best_model, X_test, y_test, config.imbalance["simulated_prior"], classes, seed=seed
     )
 
-    dropout_results = sensor_dropout_test(best_model, X_test, y_test, classes, audit_report.recommended_sensors)
+    dropout_results = sensor_dropout_test(
+        best_model, X_test, y_test, classes, audit_report.recommended_sensors
+    )
     ablation_results = feature_group_ablation_test(best_model, X_test, y_test, classes)
 
     shuffle_score = label_shuffle_control(
@@ -149,7 +158,9 @@ def run_training_pipeline(config: Config, dataset: SensorDataset | None = None) 
         # Same train-only-fitting discipline as the retained sensors, even
         # though this control never touches the held-out test set itself.
         noise_cleaners = fit_cleaners(dataset, config, excluded_sensors[:1], row_indices=idx_train)
-        noise_table, y_noise = _build_split_features(dataset, noise_cleaners, idx_train, include_wavelet=False)
+        noise_table, y_noise = _build_split_features(
+            dataset, noise_cleaners, idx_train, include_wavelet=False
+        )
         noise_cols = feature_columns(noise_table.assign(label="_"))
         noise_score = noise_sensor_control(
             lambda: get_candidate_models(seed)[best.model_name],

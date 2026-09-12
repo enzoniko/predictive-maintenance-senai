@@ -98,7 +98,7 @@ class SensorCleaner(BaseEstimator, TransformerMixin):
         self.hampel_n_sigmas = hampel_n_sigmas
         self.silent_window_std_percentile = silent_window_std_percentile
 
-    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> "SensorCleaner":
+    def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> SensorCleaner:
         X = np.asarray(X, dtype=np.float64)
         filled = np.where(np.isnan(X), np.nanmedian(X), X)
         row_std = filled.std(axis=1)

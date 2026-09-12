@@ -7,7 +7,8 @@ from pdm.models.pipeline import run_training_pipeline
 def test_training_pipeline_runs_end_to_end_on_synthetic_data(synthetic_config: Config) -> None:
     artifacts = run_training_pipeline(synthetic_config)
 
-    assert artifacts.best_model_name in {"decision_tree", "random_forest", "hist_gradient_boosting", "xgboost"}
+    expected_models = {"decision_tree", "random_forest", "hist_gradient_boosting", "xgboost"}
+    assert artifacts.best_model_name in expected_models
     assert artifacts.bundle.classes == ["Classe A", "Classe B", "Classe C", "Classe D", "Classe E"]
     assert set(artifacts.bundle.sensor_names) == {"Dados_1", "Dados_2", "Dados_3"}
 
