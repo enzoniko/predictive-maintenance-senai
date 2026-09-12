@@ -172,16 +172,18 @@ def append_answer(doc: Document) -> None:
     add_paragraph(
         doc,
         "Modelo final (HistGradientBoosting, vencedor da validação cruzada entre 4 "
-        "candidatos): F1-macro = 0,961 em teste nunca visto, erro de calibração esperado "
-        "(ECE) = 0,005, cobertura de predição conformal = 0,890 contra um alvo configurado "
-        "de 0,90 (tamanho médio do conjunto: 0,98 -- quase sempre uma única classe "
-        "confiante). Dois controles de sanidade confirmam ausência de vazamento: rótulos "
-        "embaralhados caem para F1 = 0,198 (acaso = 0,20); um modelo treinado só no sensor "
+        "candidatos, nas duas plataformas testadas): execução completa no servidor Linux "
+        "x86-64 com a stack de pesquisa inteira (MLflow, SHAP, ssqueezepy) atinge "
+        "F1-macro = 0,962 em teste nunca visto, erro de calibração esperado (ECE) = 0,006, "
+        "cobertura de predição conformal = 0,894 contra um alvo configurado de 0,90 "
+        "(tamanho médio do conjunto: 0,98 -- quase sempre uma única classe confiante). "
+        "Dois controles de sanidade confirmam ausência de vazamento: rótulos embaralhados "
+        "ficam em F1 = 0,200 (exatamente o acaso teórico); um modelo treinado só no sensor "
         "de ruído excluído fica em F1 = 0,067, abaixo até do acaso. Testes de robustez "
-        "(remoção de sensor, remoção de grupo de features) e explicabilidade (importância "
-        "por permutação / SHAP) completam a avaliação. Reprodutível via "
-        "`python -m pdm.cli train` e detalhado nos notebooks 01-03 e em "
-        "docs/01_interpretacao_problema.md.",
+        "(remoção de sensor, remoção de grupo de features) e explicabilidade (SHAP real) "
+        "completam a avaliação. Reprodutível via `python -m pdm.cli train` e detalhado "
+        "nos notebooks 01-03 e em docs/01_interpretacao_problema.md e "
+        "docs/03_arquitetura.md (seção 3.7, validação cruzada de plataforma).",
     )
 
     add_heading(doc, "6. Links", level=1)
