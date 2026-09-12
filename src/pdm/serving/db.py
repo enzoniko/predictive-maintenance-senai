@@ -40,6 +40,11 @@ class PredictionRecord(Base):
     is_silent: Mapped[bool] = mapped_column(default=False)
     sensor_names: Mapped[list] = mapped_column(JSON)
     top_shap_features: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # The engineered feature vector behind this prediction (feature name ->
+    # value), so GET /drift can compare *real* recent production traffic
+    # against the training reference instead of only a self-comparison
+    # smoke test -- see that endpoint in serving/api.py.
+    features: Mapped[dict] = mapped_column(JSON)
 
 
 class AuditRecord(Base):

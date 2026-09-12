@@ -48,9 +48,24 @@ async def lifespan(app: FastAPI):
     state["bundle"] = ModelBundle.load(bundle_path)
     state["engine"] = db.init_db(cfg.api["database_url"])
     state["session_factory"] = db.get_session_factory(state["engine"])
-    state["drift_reference"] = None  # populated lazily by GET /drift or set_drift_reference()
+    state["drift_reference"] = _load_cached_reference(cfg, state["bundle"])
     yield
     state.clear()
+
+
+def _load_cached_reference(cfg, bundle: ModelBundle):
+    """Best-effort initial drift reference from the cached feature table
+    (``python -m pdm.cli features``), restricted to this bundle's feature
+    columns. Returns None (drift scoring then requires an explicit
+    ``POST /drift/reference`` call) if no cache exists or its columns don't
+    match -- this is a convenience default, not a hard dependency."""
+    from pdm.data.io import load_feature_table
+
+    try:
+        table = load_feature_table(cfg.paths.processed_dir)
+        return table[bundle.feature_columns]
+    except (FileNotFoundError, KeyError):
+        return None
 
 
 app = FastAPI(title="Predictive Maintenance API", version="0.1.0", lifespan=lifespan)
@@ -135,7 +150,7 @@ def audit() -> AuditSummaryResponse:
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(request: PredictRequest) -> PredictResponse:
-    predicted_class, proba_by_class, conformal_set, is_silent, _features = _predict_one(request.sensors)
+    predicted_class, proba_by_class, conformal_set, is_silent, feature_values = _predict_one(request.sensors)
 
     warnings = []
     if is_silent:
@@ -158,6 +173,7 @@ def predict(request: PredictRequest) -> PredictResponse:
                 conformal_set=conformal_set,
                 is_silent=is_silent,
                 sensor_names=bundle.sensor_names,
+                features=dict(zip(bundle.feature_columns, (float(v) for v in feature_values))),
             )
         )
         session.commit()
@@ -213,26 +229,56 @@ def explain(request: PredictRequest) -> ExplainResponse:
     )
 
 
+MIN_PRODUCTION_SAMPLES_FOR_DRIFT = 30
+
+
+@app.post("/drift/reference/reload")
+def reload_drift_reference() -> dict:
+    """Re-reads the cached feature table (``python -m pdm.cli features``) as
+    the drift reference -- call this after retraining against new data."""
+    cfg = state["config"]
+    reference = _load_cached_reference(cfg, _bundle())
+    state["drift_reference"] = reference
+    n_reference = 0 if reference is None else len(reference)
+    return {"reference_loaded": reference is not None, "n_reference": n_reference}
+
+
 @app.get("/drift", response_model=DriftSummaryResponse)
-def drift() -> DriftSummaryResponse:
-    """Scores the training feature distribution against itself as a smoke
-    test when no production traffic has been recorded yet, and against
-    recent predictions' feature snapshots once they exist. A real
-    deployment would call this on a schedule against a rolling window of
-    production features (see docs/09_mlops.md)."""
+def drift(n: int = 200) -> DriftSummaryResponse:
+    """Scores the ``n`` most recent real predictions' feature vectors
+    (persisted by POST /predict) against the training reference. Requires
+    at least ``MIN_PRODUCTION_SAMPLES_FOR_DRIFT`` recorded predictions --
+    early in a deployment's life, before that much traffic exists, this
+    correctly refuses to report a drift score rather than comparing the
+    reference against itself and calling that a measurement. A real
+    deployment calls this on a schedule (see docs/09_mlops.md)."""
     reference = state.get("drift_reference")
     if reference is None:
         raise HTTPException(
             503,
-            "no drift reference set -- call set_drift_reference() at startup "
-            "or POST recent production features before scoring drift",
+            "no drift reference available -- run `python -m pdm.cli features` "
+            "then POST /drift/reference/reload, or retrain",
         )
+
+    with state["session_factory"]() as session:
+        rows = (
+            session.query(db.PredictionRecord.features)
+            .order_by(db.PredictionRecord.id.desc())
+            .limit(n)
+            .all()
+        )
+    if len(rows) < MIN_PRODUCTION_SAMPLES_FOR_DRIFT:
+        raise HTTPException(
+            503,
+            f"only {len(rows)} recorded predictions available, need at least "
+            f"{MIN_PRODUCTION_SAMPLES_FOR_DRIFT} to score drift meaningfully -- "
+            "call POST /predict more (or lower n) before checking drift",
+        )
+
+    current = pd.DataFrame([r.features for r in rows])
     cfg = state["config"]
     monitor = DriftMonitor(psi_alarm_threshold=cfg.drift["psi_alarm_threshold"]).fit(reference)
-    # Without a second batch, compare the reference to itself as a
-    # zero-drift sanity check -- see notebooks/05_deployment_demo.ipynb for
-    # a version that scores real held-out data.
-    report = monitor.score(reference)
+    report = monitor.score(current)
 
     with state["session_factory"]() as session:
         session.add(

@@ -223,6 +223,8 @@ def run_training_pipeline(config: Config, dataset: SensorDataset | None = None) 
             "test_ece": calibration.expected_calibration_error,
             "conformal_coverage": coverage,
             "conformal_avg_set_size": avg_set_size,
+            "label_shuffle_control_f1": shuffle_score,
+            "noise_sensor_control_f1": noise_score,
         },
     )
 

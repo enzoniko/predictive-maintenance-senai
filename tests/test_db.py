@@ -13,7 +13,7 @@ def test_in_memory_sqlite_keeps_tables_across_sessions() -> None:
     with session_factory() as session:
         session.add(PredictionRecord(
             model_name="test", predicted_class="Classe A", probabilities={"Classe A": 1.0},
-            conformal_set=["Classe A"], sensor_names=["Dados_1"],
+            conformal_set=["Classe A"], sensor_names=["Dados_1"], features={"Dados_1_rms": 0.1},
         ))
         session.commit()
 

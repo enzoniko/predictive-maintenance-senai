@@ -30,6 +30,20 @@ def api_client(synthetic_config_module: Config):
     bundle_path = synthetic_config_module.paths.models_dir / BUNDLE_FILENAME
     artifacts.bundle.save(bundle_path)
 
+    # Also cache a feature table, matching what `python -m pdm.cli features`
+    # would produce, so the API's startup-time and POST /drift/reference/reload
+    # drift-reference loading (serving/api.py::_load_cached_reference) has
+    # something real to find instead of silently staying unset.
+    from pdm.data.io import save_feature_table
+    from pdm.data.loader import load_sensor_dataset
+    from pdm.features.builder import build_feature_table
+
+    dataset = load_sensor_dataset(synthetic_config_module)
+    feature_table = build_feature_table(
+        dataset, synthetic_config_module, sensors=artifacts.bundle.sensor_names
+    )
+    save_feature_table(feature_table, synthetic_config_module.paths.processed_dir)
+
     import pdm.serving.api as api_module
 
     mp = pytest.MonkeyPatch()
@@ -42,8 +56,8 @@ def api_client(synthetic_config_module: Config):
     mp.undo()
 
 
-def _sample_window(config: Config, sensor_names: list[str]) -> dict[str, list[float]]:
-    rng = np.random.default_rng(0)
+def _sample_window(config: Config, sensor_names: list[str], seed: int = 0) -> dict[str, list[float]]:
+    rng = np.random.default_rng(seed)
     window_len = config.acquisition["window_length_samples"]
     return {name: rng.normal(0, 0.2, size=window_len).tolist() for name in sensor_names}
 
@@ -136,3 +150,42 @@ def test_audit_endpoint_runs_and_persists(api_client) -> None:
     body = resp.json()
     assert body["n_windows"] == 600
     assert set(body["recommended_sensors"]) <= {"Dados_1", "Dados_2", "Dados_3", "Dados_4", "Dados_5"}
+
+
+def test_drift_requires_minimum_production_samples(api_client, synthetic_config_module: Config) -> None:
+    # A fresh module-scoped client may already have a few predictions from
+    # earlier tests, but not the minimum this endpoint requires.
+    client, artifacts = api_client
+    import pdm.serving.api as api_module
+
+    with api_module.state["session_factory"]() as session:
+        from pdm.serving.db import PredictionRecord
+
+        n_existing = session.query(PredictionRecord).count()
+
+    if n_existing >= api_module.MIN_PRODUCTION_SAMPLES_FOR_DRIFT:
+        pytest.skip("enough predictions already recorded by earlier tests to satisfy the minimum")
+
+    resp = client.get("/drift")
+    assert resp.status_code == 503
+
+
+def test_drift_succeeds_once_enough_predictions_are_recorded(
+    api_client, synthetic_config_module: Config
+) -> None:
+    client, artifacts = api_client
+    import pdm.serving.api as api_module
+
+    reload_resp = client.post("/drift/reference/reload")
+    assert reload_resp.status_code == 200
+
+    for i in range(api_module.MIN_PRODUCTION_SAMPLES_FOR_DRIFT + 5):
+        window = _sample_window(synthetic_config_module, artifacts.bundle.sensor_names, seed=i)
+        client.post("/predict", json={"sensors": window})
+
+    resp = client.get("/drift")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["n_current"] >= api_module.MIN_PRODUCTION_SAMPLES_FOR_DRIFT
+    assert isinstance(body["n_alarms"], int)
+    assert len(body["top_features"]) > 0
