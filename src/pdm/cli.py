@@ -88,6 +88,7 @@ def train_cmd(
     conformal calibration) and save a deployable ModelBundle."""
     from pdm.models.bundle import BUNDLE_FILENAME
     from pdm.models.pipeline import run_training_pipeline
+    from pdm.models.registry import MLFLOW_AVAILABLE, get_tracker
 
     cfg = load_config(config_path)
     typer.echo("Running audit + feature engineering + model selection (this can take "
@@ -96,6 +97,29 @@ def train_cmd(
 
     out_path = out or (cfg.paths.models_dir / BUNDLE_FILENAME)
     artifacts.bundle.save(out_path)
+
+    tracker = get_tracker(cfg.paths.models_dir / "runs")
+    run_id = tracker.start_run(f"train-{artifacts.best_model_name}")
+    tracker.log_params(run_id, {
+        "model_name": artifacts.best_model_name,
+        "sensors": ",".join(artifacts.bundle.sensor_names),
+        "random_seed": cfg.random_seed,
+        "conformal_method": cfg.conformal["method"],
+        "conformal_target_coverage": cfg.conformal["target_coverage"],
+    })
+    numeric_metrics = {k: v for k, v in artifacts.bundle.metrics.items() if isinstance(v, (int, float))}
+    tracker.log_metrics(run_id, numeric_metrics)
+    try:
+        # mlflow.sklearn.log_model expects a real scikit-learn estimator;
+        # models/train.py::EncodedLabelClassifier (the XGBoost wrapper) is
+        # not one, so this is best-effort -- the ModelBundle joblib file
+        # (already saved above) remains the source of truth serving/api.py
+        # actually loads, regardless of whether this logging step succeeds.
+        tracker.log_model(run_id, artifacts.bundle.model)
+    except Exception as exc:  # noqa: BLE001 -- deliberately broad, see comment above
+        typer.echo(f"Warning: could not log the model artifact to the tracker ({exc})")
+    typer.echo(f"Logged to {'MLflow' if MLFLOW_AVAILABLE else 'local tracker'} (run {run_id}) "
+               f"under {cfg.paths.models_dir / 'runs'}")
 
     typer.echo(f"Best model: {artifacts.best_model_name}")
     typer.echo(f"Test macro F1: {artifacts.test_classification_report['macro avg']['f1-score']:.4f}")
