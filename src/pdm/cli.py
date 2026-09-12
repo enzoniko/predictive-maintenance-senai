@@ -67,6 +67,7 @@ def features_cmd(
 ) -> None:
     """Build and cache the engineered feature table (time + frequency + wavelet)."""
     from pdm.data.audit import run_audit
+    from pdm.data.io import save_feature_table
     from pdm.data.loader import load_sensor_dataset
     from pdm.features.builder import build_feature_table
 
@@ -75,9 +76,7 @@ def features_cmd(
     report = run_audit(dataset, cfg)
     table = build_feature_table(dataset, cfg, sensors=report.recommended_sensors)
 
-    out_path = cfg.paths.processed_dir / "features.parquet"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    table.to_parquet(out_path)
+    out_path = save_feature_table(table, cfg.paths.processed_dir)
     typer.echo(f"Feature table: {table.shape} -> {out_path}")
 
 
