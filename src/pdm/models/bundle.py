@@ -41,7 +41,13 @@ class ModelBundle:
 
     def save(self, path: Path) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump(self, path)
+        # Uncompressed, this HistGradientBoostingClassifier-based bundle
+        # weighed in at 5.8 MB -- on its own already over the case
+        # submission's 5 MB-per-attachment limit once the repo is zipped.
+        # joblib's zlib compression (level 9, the max) brings a real bundle
+        # from this project down to ~2.9 MB with no change to what gets
+        # loaded back.
+        joblib.dump(self, path, compress=9)
         return path
 
     @staticmethod
