@@ -52,6 +52,30 @@ class Config:
     raw: dict[str, Any] = field(repr=False, default_factory=dict)
 
 
+def _resolve_sqlite_url(url: str) -> str:
+    """Anchor a relative ``sqlite:///`` URL to REPO_ROOT instead of leaving
+    it relative to the process's working directory.
+
+    A relative SQLite URL like the default ``sqlite:///./pdm.db`` resolves
+    against whatever the *current* process considers its working directory
+    -- for a plain script that is usually the repo root, but a Jupyter
+    kernel defaults its working directory to the notebook's own folder.
+    Running notebooks/03_api_demo.ipynb (which spawns the real API as a
+    subprocess) surfaced this directly: the database silently ended up at
+    notebooks/pdm.db instead of the repo root, invisible until something
+    went looking for it in the "obvious" place. A four-slash
+    (``sqlite:////absolute/path``) or in-memory (``sqlite:///:memory:``)
+    URL is left untouched, and any non-SQLite URL (Postgres, in
+    docker-compose) never matches the prefix check at all.
+    """
+    prefix = "sqlite:///"
+    if not url.startswith(prefix) or url.startswith("sqlite:////") or ":memory:" in url:
+        return url
+    relative_path = url[len(prefix) :]
+    absolute_path = (REPO_ROOT / relative_path).resolve()
+    return f"{prefix}{absolute_path.as_posix()}"
+
+
 def load_config(path: str | Path | None = None) -> Config:
     """Load configs/default.yaml (or an override) into a typed Config."""
     cfg_path = Path(path) if path is not None else DEFAULT_CONFIG_PATH
@@ -64,6 +88,7 @@ def load_config(path: str | Path | None = None) -> Config:
     env_database_url = os.environ.get("PDM_DATABASE_URL")
     if env_database_url:
         raw["api"]["database_url"] = env_database_url
+    raw["api"]["database_url"] = _resolve_sqlite_url(raw["api"]["database_url"])
 
     p = raw["paths"]
     paths = Paths(
