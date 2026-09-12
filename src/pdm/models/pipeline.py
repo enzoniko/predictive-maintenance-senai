@@ -66,7 +66,7 @@ class TrainingArtifacts:
     extra: dict[str, Any] = field(default_factory=dict)
 
 
-def _stratified_three_way_split_indices(
+def stratified_three_way_split_indices(
     y: np.ndarray, split_cfg: dict, seed: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Split at the level of raw-window indices, *before* any feature is
@@ -86,7 +86,7 @@ def _stratified_three_way_split_indices(
     return idx_train, idx_calib, idx_test
 
 
-def _build_split_features(
+def build_split_features(
     dataset: SensorDataset,
     cleaners: dict,
     idx: np.ndarray,
@@ -100,22 +100,61 @@ def _build_split_features(
     return table, dataset.labels[idx]
 
 
+def evaluate_bundle_on_holdout(
+    config: Config, bundle: ModelBundle, dataset: SensorDataset | None = None
+) -> dict[str, Any]:
+    """Reconstruct the exact held-out test split a bundle was evaluated on
+    at training time (same seed, same index split) and re-run inference on
+    it, without repeating the expensive audit + full-dataset feature build
+    + model-selection steps ``run_training_pipeline`` needs. Used by
+    notebooks/02 to reproduce the confusion matrix, calibration and
+    robustness plots against real held-out data in seconds rather than
+    minutes -- the bundle's already-fitted cleaners make this possible.
+    """
+    dataset = dataset or load_sensor_dataset(config)
+    _, _, idx_test = stratified_three_way_split_indices(dataset.labels, config.split, config.random_seed)
+
+    raw = {name: dataset.sensors[name][idx_test] for name in bundle.sensor_names}
+    table, is_silent = build_features_from_raw(
+        raw, bundle.cleaners, bundle.sample_rate_hz, include_wavelet=True
+    )
+    X_test = table[bundle.feature_columns]
+    y_test = dataset.labels[idx_test]
+
+    y_pred = bundle.model.predict(X_test)
+    proba = bundle.model.predict_proba(X_test)
+
+    conformal_sets = None
+    if bundle.conformal is not None:
+        conformal_sets = bundle.conformal.predict_sets(proba)
+
+    return {
+        "idx_test": idx_test,
+        "X_test": X_test,
+        "y_test": y_test,
+        "y_pred": y_pred,
+        "proba": proba,
+        "is_silent": is_silent,
+        "conformal_sets": conformal_sets,
+    }
+
+
 def run_training_pipeline(config: Config, dataset: SensorDataset | None = None) -> TrainingArtifacts:
     dataset = dataset or load_sensor_dataset(config)
     audit_report = run_audit(dataset, config)
     seed = config.random_seed
     classes = sorted(set(dataset.labels.tolist()))
 
-    idx_train, idx_calib, idx_test = _stratified_three_way_split_indices(dataset.labels, config.split, seed)
+    idx_train, idx_calib, idx_test = stratified_three_way_split_indices(dataset.labels, config.split, seed)
 
     # Cleaning thresholds (saturation, silence) are fit on the training
     # indices only, then reused unchanged for calibration and test -- see
     # features/builder.py's module docstring.
     cleaners = fit_cleaners(dataset, config, audit_report.recommended_sensors, row_indices=idx_train)
 
-    train_table, y_train = _build_split_features(dataset, cleaners, idx_train)
-    calib_table, y_calib = _build_split_features(dataset, cleaners, idx_calib)
-    test_table, y_test = _build_split_features(dataset, cleaners, idx_test)
+    train_table, y_train = build_split_features(dataset, cleaners, idx_train)
+    calib_table, y_calib = build_split_features(dataset, cleaners, idx_calib)
+    test_table, y_test = build_split_features(dataset, cleaners, idx_test)
 
     cols = feature_columns(train_table.assign(label="_"))
     X_train, X_calib, X_test = train_table[cols], calib_table[cols], test_table[cols]
@@ -158,7 +197,7 @@ def run_training_pipeline(config: Config, dataset: SensorDataset | None = None) 
         # Same train-only-fitting discipline as the retained sensors, even
         # though this control never touches the held-out test set itself.
         noise_cleaners = fit_cleaners(dataset, config, excluded_sensors[:1], row_indices=idx_train)
-        noise_table, y_noise = _build_split_features(
+        noise_table, y_noise = build_split_features(
             dataset, noise_cleaners, idx_train, include_wavelet=False
         )
         noise_cols = feature_columns(noise_table.assign(label="_"))

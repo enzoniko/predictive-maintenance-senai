@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pdm.config import Config
-from pdm.models.pipeline import run_training_pipeline
+from pdm.models.pipeline import evaluate_bundle_on_holdout, run_training_pipeline
 
 
 def test_training_pipeline_runs_end_to_end_on_synthetic_data(synthetic_config: Config) -> None:
@@ -47,3 +47,22 @@ def test_training_pipeline_bundle_round_trips(tmp_path, synthetic_config: Config
     )
     pred = loaded.model.predict(sample)
     assert pred[0] in loaded.classes
+
+
+def test_evaluate_bundle_on_holdout_reproduces_test_metrics(synthetic_config: Config) -> None:
+    from sklearn.metrics import f1_score
+
+    artifacts = run_training_pipeline(synthetic_config)
+    result = evaluate_bundle_on_holdout(synthetic_config, artifacts.bundle)
+
+    assert len(result["y_test"]) == len(result["y_pred"]) == len(result["proba"])
+    assert result["X_test"].shape[1] == len(artifacts.bundle.feature_columns)
+
+    classes = artifacts.bundle.classes
+    f1 = f1_score(result["y_test"], result["y_pred"], labels=classes, average="macro", zero_division=0)
+    # Reconstructing the same held-out split independently should reproduce
+    # (not just approximate) the F1 the training pipeline itself measured.
+    assert abs(f1 - artifacts.test_classification_report["macro avg"]["f1-score"]) < 1e-9
+
+    if result["conformal_sets"] is not None:
+        assert result["conformal_sets"].shape == (len(result["y_test"]), len(classes))
