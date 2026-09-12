@@ -140,7 +140,7 @@ def test_explain_returns_top_features(api_client, synthetic_config_module: Confi
     body = resp.json()
     assert body["predicted_class"] in artifacts.bundle.classes
     assert len(body["top_features"]) > 0
-    assert body["method"] in ("shap", "feature_importances")
+    assert body["method"] in ("shap", "lime", "feature_importances")
 
 
 def test_audit_endpoint_runs_and_persists(api_client) -> None:

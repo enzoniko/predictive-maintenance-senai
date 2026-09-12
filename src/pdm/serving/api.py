@@ -214,9 +214,34 @@ def explain(request: PredictRequest) -> ExplainResponse:
         except Exception:  # pragma: no cover -- defensive fallback below covers this
             pass
 
-    # Fallback: the model's own (global) feature_importances_, when present,
-    # ranked and reported as the closest available substitute to a local
-    # explanation on a platform without SHAP -- see evaluation/explain.py.
+    # Fallback 2: LIME, a local (per-instance) explanation like SHAP -- and,
+    # unlike the feature_importances_ fallback this replaced, one that
+    # actually exists for every model here: HistGradientBoostingClassifier
+    # (the model this bundle's own training run selected) has no
+    # feature_importances_ attribute at all, so on a platform without SHAP
+    # (this Windows ARM64 dev machine, see docs/03_arquitetura.md sec. 3.6)
+    # the old fallback always raised 503 -- caught by notebooks/03's demo
+    # run, not a hypothetical. LIME needs a background sample to perturb
+    # around; the cached drift reference (already loaded at startup) serves
+    # that purpose without requiring the full training set at inference time.
+    reference = state.get("drift_reference")
+    if reference is not None:
+        try:
+            from pdm.evaluation.explain import lime_explain_instance
+
+            row = pd.Series(feature_values, index=bundle.feature_columns)
+            lime_exp = lime_explain_instance(
+                bundle.model, reference, row, class_names=bundle.classes, num_features=10
+            )
+            label = lime_exp.available_labels()[0]
+            top_features = [
+                {"feature": f, "weight": float(w)} for f, w in lime_exp.as_list(label=label)
+            ]
+            return ExplainResponse(predicted_class=predicted_class, top_features=top_features, method="lime")
+        except Exception:  # pragma: no cover -- defensive fallback below covers this
+            pass
+
+    # Fallback 3: the model's own (global) feature_importances_, when present.
     importances = getattr(bundle.model, "feature_importances_", None)
     if importances is None:
         raise HTTPException(503, "no explainability backend available for this model/platform")
