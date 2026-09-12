@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from pdm.models.train import (
+    XGBOOST_AVAILABLE,
     cross_validate_models,
     feature_columns,
     fit_final_model,
@@ -59,3 +60,19 @@ def test_fit_final_model_predicts_training_labels_well() -> None:
     preds = fitted.predict(X)
     accuracy = (preds == y).mean()
     assert accuracy > 0.95
+
+
+@pytest.mark.skipif(not XGBOOST_AVAILABLE, reason="xgboost not installed on this platform")
+def test_xgboost_wrapper_exposes_string_label_interface() -> None:
+    table = _make_separable_table()
+    X, y = split_features_labels(table)
+    model = get_candidate_models(seed=0)["xgboost"]
+    fitted = fit_final_model(model, X, y, model_name="xgboost")
+
+    preds = fitted.predict(X)
+    assert preds.dtype.kind in ("U", "O")  # strings, not raw integer codes
+    assert (preds == y).mean() > 0.95
+
+    proba = fitted.predict_proba(X)
+    assert list(fitted.classes_) == sorted(set(y.tolist()))
+    assert proba.shape == (len(y), 3)

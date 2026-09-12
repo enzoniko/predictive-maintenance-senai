@@ -81,17 +81,54 @@ def features_cmd(
 
 
 @app.command("train")
-def train_cmd() -> None:
-    """Train, tune and register the candidate models. See src/pdm/models/train.py."""
-    typer.echo("Not yet wired into the CLI -- run notebooks/03_feasibility_modeling.ipynb "
-               "or `python -m pdm.models.train` directly for now.")
+def train_cmd(
+    config_path: Path = typer.Option(None, "--config", help="Path to a config YAML"),
+    out: Path = typer.Option(None, help="Where to save the model bundle"),
+) -> None:
+    """Run the full pipeline (audit -> features -> model selection ->
+    conformal calibration) and save a deployable ModelBundle."""
+    from pdm.models.bundle import BUNDLE_FILENAME
+    from pdm.models.pipeline import run_training_pipeline
+
+    cfg = load_config(config_path)
+    typer.echo("Running audit + feature engineering + model selection (this can take "
+               "several minutes on the full dataset)...")
+    artifacts = run_training_pipeline(cfg)
+
+    out_path = out or (cfg.paths.models_dir / BUNDLE_FILENAME)
+    artifacts.bundle.save(out_path)
+
+    typer.echo(f"Best model: {artifacts.best_model_name}")
+    typer.echo(f"Test macro F1: {artifacts.test_classification_report['macro avg']['f1-score']:.4f}")
+    typer.echo(f"Test ECE: {artifacts.test_calibration.expected_calibration_error:.4f}")
+    typer.echo(f"Conformal coverage @ target {cfg.conformal['target_coverage']}: "
+               f"{artifacts.conformal_coverage:.4f} (avg set size {artifacts.conformal_avg_set_size:.2f})")
+    typer.echo(f"Controls -- label shuffle F1: {artifacts.label_shuffle_control_f1:.4f}, "
+               f"excluded-sensor F1: {artifacts.noise_sensor_control_f1:.4f} (chance ~= "
+               f"{1 / len(artifacts.bundle.classes):.4f})")
+    typer.echo(f"Bundle saved to {out_path}")
 
 
 @app.command("evaluate")
-def evaluate_cmd() -> None:
-    """Run the full evaluation suite. See src/pdm/evaluation/."""
-    typer.echo("Not yet wired into the CLI -- see notebooks/04_evaluation_robustness_"
-               "explainability.ipynb.")
+def evaluate_cmd(
+    config_path: Path = typer.Option(None, "--config", help="Path to a config YAML"),
+    bundle_path: Path = typer.Option(None, help="Path to a saved model bundle"),
+) -> None:
+    """Print the evaluation summary for a saved bundle (re-runs the pipeline
+    if no cached artifacts are found -- see also `python -m pdm.cli train`,
+    which prints the same summary right after training)."""
+    from pdm.models.bundle import BUNDLE_FILENAME, ModelBundle
+
+    cfg = load_config(config_path)
+    path = bundle_path or (cfg.paths.models_dir / BUNDLE_FILENAME)
+    if not path.exists():
+        typer.echo(f"No bundle at {path} -- run `python -m pdm.cli train` first.")
+        raise typer.Exit(1)
+
+    bundle = ModelBundle.load(path)
+    typer.echo(f"Model: {bundle.model_name}  Trained: {bundle.created_at}")
+    for k, v in bundle.metrics.items():
+        typer.echo(f"  {k}: {v}")
 
 
 @app.command("serve")

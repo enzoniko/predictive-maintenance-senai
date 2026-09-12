@@ -135,7 +135,43 @@ def _encode_if_needed(model_name: str, y: np.ndarray) -> np.ndarray:
     return np.array([mapping[label] for label in y])
 
 
+class EncodedLabelClassifier:
+    """Adapts an estimator that needs integer-encoded labels (XGBoost) to
+    the plain string-label interface (``predict``, ``predict_proba``,
+    ``classes_``) every other model in this module already exposes.
+    Without this, every downstream consumer (evaluation/imbalance.py,
+    evaluation/robustness.py, evaluation/conformal.py, serving/api.py) would
+    need its own special case for "this one model returns integers" -- the
+    wrapper contains that concern in one place instead.
+    """
+
+    def __init__(self, estimator: object, mapping: dict[str, int]) -> None:
+        self.estimator = estimator
+        self.mapping = mapping
+        self.inverse_mapping = {v: k for k, v in mapping.items()}
+        # predict_proba's column order follows the encoded integers 0..k-1,
+        # which is exactly what this reconstructs.
+        self.classes_ = np.array([self.inverse_mapping[i] for i in range(len(mapping))])
+
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> "EncodedLabelClassifier":
+        y_encoded = np.array([self.mapping[label] for label in y])
+        self.estimator.fit(X, y_encoded)
+        return self
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        encoded = self.estimator.predict(X)
+        return np.array([self.inverse_mapping[p] for p in encoded])
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        return self.estimator.predict_proba(X)
+
+
 def fit_final_model(model: object, X: pd.DataFrame, y: np.ndarray, model_name: str = "") -> object:
-    y_ = _encode_if_needed(model_name, y)
-    model.fit(X, y_)
+    """Fit ``model`` on string labels directly, wrapping it first if it is
+    one of the models that needs integer-encoded labels internally. Returns
+    the (possibly wrapped) fitted model; callers should keep using the
+    returned object, not the original."""
+    if model_name == "xgboost":
+        model = EncodedLabelClassifier(model, label_mapping(y))
+    model.fit(X, y)
     return model
