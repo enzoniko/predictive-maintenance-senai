@@ -13,6 +13,7 @@ template's final paragraph.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -23,9 +24,10 @@ CANDIDATE_NAME = "Enzo Nicolás Spotorno Bieger"
 CANDIDATE_EMAIL = "enzonsb@gmail.com"
 GITHUB_URL = "https://github.com/enzoniko/predictive-maintenance-senai"
 
-# CPF is intentionally left blank -- this script never guesses or stores
-# personal identification numbers. Fill it in Word before submitting.
-CANDIDATE_CPF = ""
+# Never hardcoded (this script is committed to a public repository): read
+# from an environment variable at generation time, or leave blank and fill
+# it in Word before submitting.
+CANDIDATE_CPF = os.environ.get("CANDIDATE_CPF", "")
 
 
 def fill_candidate_fields(doc: Document) -> None:
