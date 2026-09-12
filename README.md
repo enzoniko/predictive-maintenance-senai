@@ -96,10 +96,10 @@ actionable error instead of a bare traceback. The bundle committed to this
 repo is the one this development environment can load; `docs/03_arquitetura.md`
 section 3.7 reports both platforms' numbers side by side.
 
-Docker Compose was reviewed and its dependencies confirmed installable on
-the Linux target, but `docker compose up` itself was not run end-to-end
-there: the test server's Docker daemon requires `sudo`, which needs a
-password not available in this session.
+`docker compose up` was run end-to-end on the Linux target: all three
+services (api, dashboard, postgres) start healthy, and a real `POST
+/predict` call returns a prediction and persists the row in the
+containerized Postgres database, confirmed with a direct `SELECT`.
 
 ## License
 
