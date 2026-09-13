@@ -20,7 +20,7 @@ Incorporar conhecimento físico como viés indutivo (via termos de perda ou rest
 
 - **Bieger et al., "Physics-Informed Residual-Based Anomaly Detection and Open-Set Recognition System"**, IEEE IECON 2025 (prêmio IEEE IES SYPA): resíduos de uma PINN quantificam o desvio do comportamento esperado, um limiar é definido via Teoria de Valores Extremos, e uma rede Siamesa trata tanto falhas conhecidas quanto nunca vistas. Em sinais de vibração de máquina rotativa: 99,27% F1 de detecção, 82% de reconhecimento. Essa é a base direta das hipóteses H2 e H4 do track de pesquisa.
 - **Bieger et al., "Linking Physical Fidelity to Downstream Performance in Physics-Informed Fault Diagnosis"**, IEEE Access (Q1), 2026: um protocolo de avaliação em três fases (fidelidade física, separabilidade, robustez *downstream*) mostra que baselines sem restrição física aprendem atalhos e colapsam em falhas nunca vistas, enquanto a perda física como viés indutivo atinge F1 = 84,0% de estado da arte.
-- **Hard-Constrained Recurrent PINNs (HRPINN)** (tese de qualificação, UFSC, defendida perante banca UFSC/Coimbra/Luxemburgo, 2026): restrição física arquitetural em vez de penalizada, com melhor eficiência de dados e estabilidade de otimização (base da hipótese H8).
+- **Hard-Constrained Recurrent PINNs (HRPINN)** (tese de conclusão de curso de graduação, UFSC, defendida perante banca UFSC/Coimbra/Luxemburgo, 2025): restrição física arquitetural em vez de penalizada, com melhor eficiência de dados e estabilidade de otimização (base da hipótese H8).
 
 ## 8.5 Aprendizado não, semi e auto-supervisionado
 

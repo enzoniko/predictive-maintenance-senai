@@ -3,39 +3,80 @@
 ## 3.1 Visão de contexto
 
 ```mermaid
-C4Context
-    Person(operador, "Operador / Time de Manutenção", "Consulta predições e alarmes")
-    Person(diretor, "Diretor / Stakeholder", "Acompanha valor e risco do projeto")
-    System(pdm, "Sistema de Manutenção Preditiva", "Audita dados, treina modelos, serve predições com incerteza calibrada")
-    System_Ext(automacao, "Banco de dados do time de Automação/Software", "Sensores e placas -> banco já modelado pelo cliente")
-    System_Ext(dashboard_ext, "Dashboards da planta", "Consumo dos alarmes/predições")
+flowchart LR
+    automacao["Banco de dados do cliente<br/>Sensores e placas integrados"]
+    entrada(["Fornece janelas<br/>de sinais"])
+    pdm["Sistema de Manutenção Preditiva<br/>Auditoria, treinamento e inferência<br/>com incerteza calibrada"]
+    saida(["API ou banco<br/>de predições"])
+    dashboard["Dashboards da planta<br/>Alarmes e predições"]
 
-    Rel(automacao, pdm, "Fornece janelas de sinais (leitura)")
-    Rel(pdm, operador, "Predição + incerteza + explicação")
-    Rel(pdm, diretor, "Relatórios de auditoria, drift e valor")
-    Rel(pdm, dashboard_ext, "Alimenta via API/banco de predições")
+    operador["Operador / Manutenção<br/>Consulta predições e alarmes"]
+    op_info(["Predição, incerteza<br/>e explicação"])
+
+    diretor["Diretor / Stakeholder<br/>Acompanha valor e risco"]
+    dir_info(["Auditoria, drift<br/>e valor"])
+
+    automacao --> entrada --> pdm
+    pdm --> saida --> dashboard
+    pdm --> op_info --> operador
+    pdm --> dir_info --> diretor
+
+    classDef person fill:#fff3cd,stroke:#9a7600,color:#202020
+    classDef system fill:#e8f1ff,stroke:#3569a8,color:#202020
+    classDef external fill:#f2f2f2,stroke:#666,color:#202020
+    classDef relation fill:#ffffff,stroke:#999,color:#303030,stroke-dasharray:3 3
+
+    class operador,diretor person
+    class pdm system
+    class automacao,dashboard external
+    class entrada,saida,op_info,dir_info relation
 ```
+
+
 
 ## 3.2 Visão de containers (o que existe hoje na prévia)
 
 ```mermaid
-C4Container
-    System_Boundary(pdm, "Sistema de Manutenção Preditiva") {
-        Container(cli, "CLI (typer)", "Python", "audit | features | train | evaluate | serve")
-        Container(pipeline, "Pipeline de treino", "scikit-learn/XGBoost/Optuna", "Auditoria -> features -> seleção de modelo -> calibração conformal")
-        Container(bundle, "ModelBundle", "joblib", "Modelo + limpadores + conformal + metadados, artefato único versionável")
-        Container(api, "API de inferência", "FastAPI", "/predict /predict_batch /explain /audit /drift /health")
-        ContainerDb(db, "Banco de predições/auditoria/drift", "SQLite (local) / Postgres (docker-compose)", "Só o que a IA produz, ver 02_engenharia_requisitos.md 2.4")
-        Container(dashboard, "Dashboard", "Streamlit", "Visualização para o time de manutenção")
-    }
-    System_Ext(automacao, "Banco de dados do cliente", "Sensores brutos")
+flowchart LR
+    automacao["Banco de dados do cliente<br/>Sensores brutos"]
+    leitura(["Leitura de janelas<br/>Simulada por download_data.py"])
 
-    Rel(cli, pipeline, "invoca")
-    Rel(pipeline, automacao, "lê janelas (hoje: scripts/download_data.py simula essa leitura)")
-    Rel(pipeline, bundle, "gera")
-    Rel(api, bundle, "carrega no startup")
-    Rel(api, db, "persiste cada chamada")
-    Rel(dashboard, api, "HTTP")
+    subgraph sistema["Sistema de Manutenção Preditiva"]
+        direction LR
+
+        cli["CLI<br/>Typer / Python<br/>audit · features · train<br/>evaluate · serve"]
+        invoca(["Invoca"])
+
+        pipeline["Pipeline de treino<br/>scikit-learn · XGBoost · Optuna<br/>Auditoria → features → seleção<br/>→ calibração conformal"]
+        gera(["Gera"])
+
+        bundle["ModelBundle<br/>joblib<br/>Modelo, limpadores, conformal<br/>e metadados"]
+        carrega(["Carregado<br/>no startup"])
+
+        api["API de inferência<br/>FastAPI<br/>predict · explain · audit<br/>drift · health"]
+
+        persiste(["Persiste<br/>resultados"])
+        db[("Banco de resultados<br/>SQLite / PostgreSQL<br/>Predições, auditoria e drift")]
+
+        http(["HTTP"])
+        dashboard["Dashboard<br/>Streamlit<br/>Interface de manutenção"]
+
+        cli --> invoca --> pipeline
+        pipeline --> gera --> bundle
+        bundle --> carrega --> api
+        api --> persiste --> db
+        api --> http --> dashboard
+    end
+
+    automacao --> leitura --> pipeline
+
+    classDef container fill:#e8f1ff,stroke:#3569a8,color:#202020
+    classDef external fill:#f2f2f2,stroke:#666,color:#202020
+    classDef relation fill:#ffffff,stroke:#999,color:#303030,stroke-dasharray:3 3
+
+    class cli,pipeline,bundle,api,db,dashboard container
+    class automacao external
+    class leitura,invoca,gera,carrega,persiste,http relation
 ```
 
 ## 3.3 Pipeline de treino (o que `python -m pdm.cli train` executa)

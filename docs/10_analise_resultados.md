@@ -69,7 +69,7 @@ Isso não invalida a ideia, só localiza onde ela se aplica. As regras da árvor
 
 A **primeira pergunta da árvore inteira** (energia de `Dados_1` na banda 3500–4000 Hz) já é, sozinha, o corte mais informativo de todo o conjunto (importância Gini 0,39, mais que o dobro da segunda posição). Isso é uma regra genuinamente comunicável para o chão de fábrica: *"quando a energia nessa banda de frequência de `Dados_1` sobe, a máquina sai do regime C/D/E para o regime A/B/C"*, uma frase, não um modelo.
 
-**Recomendação prática** (a incorporar no roteiro de pesquisa, `06_track_pesquisa.md`): usar essa árvore rasa não como classificador de produção, mas como **camada de triagem/explicação de primeira linha**. Ela concorda com o ensemble na maioria dos casos fáceis e serve de checagem de sanidade legível para o operador, enquanto o ensemble, com predição conformal, decide os casos que a árvore rasa erraria. Essa combinação, regra simples para o caso comum e modelo forte com incerteza calibrada para o caso difícil, tende a gerar mais confiança na indústria do que qualquer um dos dois sozinho.
+**Recomendação prática**: usar essa árvore rasa não como classificador de produção, mas como **camada de triagem/explicação de primeira linha**. Ela concorda com o ensemble na maioria dos casos fáceis e serve de checagem de sanidade legível para o operador, enquanto o ensemble, com predição conformal, decide os casos que a árvore rasa erraria. Essa combinação, regra simples para o caso comum e modelo forte com incerteza calibrada para o caso difícil, tende a gerar mais confiança na indústria do que qualquer um dos dois sozinho.
 
 ## 10.3 O que os métodos de explicabilidade mostraram: convergência entre três métodos independentes
 
