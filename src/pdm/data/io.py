@@ -1,14 +1,14 @@
 """Feature-table caching, with a Parquet-or-joblib fallback.
 
 ``DataFrame.to_parquet``/``read_parquet`` need ``pyarrow`` (or
-``fastparquet``). ``pyarrow`` has no prebuilt wheel for Windows ARM64 and
-fails to build there without a C/C++ toolchain -- the same root cause
-already documented for mlflow/streamlit/shap/ssqueezepy (see
-docs/03_arquitetura.md, "Platform notes"). Parquet is still tried first
-(smaller files, preserves dtypes precisely, and is what the Linux x86-64
-deployment target uses), but ``save_feature_table``/``load_feature_table``
-transparently fall back to a joblib-pickled DataFrame -- same API, same
-call sites, no environment-specific branching needed outside this module.
+``fastparquet``), a compiled dependency that not every environment builds
+cleanly; the same root cause already documented for
+mlflow/shap/ssqueezepy (see docs/03_arquitetura.md, section 3.6). Parquet
+is still tried first (smaller files, preserves dtypes precisely, and is
+what the deployment target uses), but
+``save_feature_table``/``load_feature_table`` transparently fall back to a
+joblib-pickled DataFrame; same API, same call sites, no
+environment-specific branching needed outside this module.
 """
 
 from __future__ import annotations
@@ -45,5 +45,5 @@ def load_feature_table(out_dir: Path) -> pd.DataFrame:
     if fallback_path.exists():
         return joblib.load(fallback_path)
     raise FileNotFoundError(
-        f"No cached feature table in {out_dir} -- run `python -m pdm.cli features` first."
+        f"No cached feature table in {out_dir}; run `python -m pdm.cli features` first."
     )

@@ -53,7 +53,7 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     downloaded = gdown.download_folder(url=args.url, output=str(args.out), quiet=False)
     if not downloaded:
-        print("gdown reported no files downloaded -- check the folder URL/permissions.",
+        print("gdown reported no files downloaded; check the folder URL/permissions.",
               file=sys.stderr)
         return 1
 

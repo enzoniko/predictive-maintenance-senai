@@ -28,7 +28,7 @@ def test_no_env_var_keeps_yaml_default(monkeypatch) -> None:
     monkeypatch.delenv("PDM_DATABASE_URL", raising=False)
     cfg = load_config()
     # The YAML default is the relative "sqlite:///./pdm.db", but
-    # _resolve_sqlite_url anchors it to REPO_ROOT -- see the dedicated test
+    # _resolve_sqlite_url anchors it to REPO_ROOT; see the dedicated test
     # below for why that matters.
     assert cfg.api["database_url"].endswith("pdm.db")
     assert cfg.api["database_url"].startswith("sqlite:///")
@@ -49,7 +49,7 @@ def test_relative_sqlite_url_is_anchored_to_repo_root(monkeypatch) -> None:
     # Regression check: this must be an absolute path, not left relative to
     # whatever directory happened to invoke the process (a Jupyter kernel's
     # default working directory is the notebook's own folder, not the repo
-    # root -- see config.py's _resolve_sqlite_url docstring).
+    # root; see config.py's _resolve_sqlite_url docstring).
     resolved_path = url[len("sqlite:///"):]
     from pathlib import Path
 

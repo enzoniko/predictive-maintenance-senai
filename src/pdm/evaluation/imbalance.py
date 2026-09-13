@@ -1,6 +1,6 @@
 """Re-evaluate a model under a realistic class prior.
 
-The case dataset is perfectly balanced (10,000 windows per class -- see
+The case dataset is perfectly balanced (10,000 windows per class; see
 docs/data_audit findings), which the audit flags as almost certainly
 curated rather than representative of a real factory floor, where healthy
 operation dominates and specific faults are comparatively rare. Reporting
@@ -25,7 +25,7 @@ def resample_to_prior(
 ) -> tuple[pd.DataFrame, np.ndarray]:
     """Subsample (X, y) without replacement so class proportions match
     ``prior``. The total output size is capped by whichever class has the
-    least headroom, so no class is ever oversampled with repeats -- this
+    least headroom, so no class is ever oversampled with repeats; this
     changes *proportions*, not the reliability of any individual class's
     represented sample."""
     if not np.isclose(sum(prior.values()), 1.0, atol=1e-6):
@@ -77,7 +77,7 @@ def evaluate_under_prior(
 
     pr_auc_per_class = {}
     if proba is not None:
-        # Do not assume `classes` and `model.classes_` share column order --
+        # Do not assume `classes` and `model.classes_` share column order;
         # look each one up explicitly (bitten once already by an analogous
         # assumption with XGBoost's integer label encoding; see
         # models/train.py's label_mapping docstring).

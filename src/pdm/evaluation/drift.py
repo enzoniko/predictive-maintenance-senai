@@ -1,8 +1,8 @@
 """Feature-distribution drift monitoring (PSI + Kolmogorov-Smirnov).
 
 Fit once on a reference distribution (the training set), then score any
-later batch -- one incoming production batch, or a whole day/week of
-predictions pulled back from the database (see serving/db.py) -- for how
+later batch; one incoming production batch, or a whole day/week of
+predictions pulled back from the database (see serving/db.py); for how
 far each feature has moved. This is what turns "the model was 96% accurate
 in the case study" into an operational claim: without drift monitoring, a
 model silently degrading as the machine wears, gets serviced, or has its
@@ -27,7 +27,7 @@ def _psi_for_feature(reference: np.ndarray, current: np.ndarray, n_bins: int = 1
     quantiles = np.linspace(0, 1, n_bins + 1)
     edges = np.unique(np.quantile(reference, quantiles))
     if len(edges) < 3:
-        return 0.0  # degenerate (near-constant) feature -- nothing to compare
+        return 0.0  # degenerate (near-constant) feature; nothing to compare
     edges[0], edges[-1] = -np.inf, np.inf
 
     ref_counts, _ = np.histogram(reference, bins=edges)

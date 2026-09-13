@@ -41,3 +41,15 @@ Thumbs.db
 
 # Deliverables assembled outside the repo
 deliverables/
+
+# Local scripts that assemble the selection-process deliverables (docx,
+# slide decks, architecture PDF), not part of the pipeline or API.
+scripts/fill_docx_template.py
+scripts/build_slides.py
+scripts/build_architecture_pdf.py
+scripts/generate_deliverable_assets.py
+
+# Offline pip wheelhouse for Docker builds on flaky networks (see
+# docker/Dockerfile.api); regenerate locally, never commit the wheels.
+docker/wheelhouse/*
+!docker/wheelhouse/.gitkeep

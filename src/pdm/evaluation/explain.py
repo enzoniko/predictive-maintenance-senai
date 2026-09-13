@@ -1,10 +1,9 @@
 """Model explainability: permutation importance (always available), SHAP
 and LIME (optional).
 
-``shap`` needs a C/C++ toolchain to build from source on Windows ARM64
-(same root cause as mlflow/streamlit/ssqueezepy -- no prebuilt wheel
-exists there; confirmed importable on the Linux x86-64 test server, see
-docs/03_arquitetura.md). ``lime`` is pure Python and installs everywhere.
+``shap`` needs a C/C++ toolchain to build from source (same root cause as
+mlflow/ssqueezepy; see docs/03_arquitetura.md, section 3.6). ``lime`` is
+pure Python and installs everywhere.
 Every function here degrades gracefully rather than raising when SHAP is
 unavailable, so the rest of the evaluation suite is never blocked by it.
 """
@@ -47,16 +46,13 @@ def permutation_importance_report(
 
 def _aggregate_shap_values(shap_values) -> np.ndarray:
     """Reduce a TreeExplainer's ``shap_values`` output to one mean-|value|
-    per feature, regardless of which of the three shapes SHAP hands back --
+    per feature, regardless of which of the three shapes SHAP hands back,
     kept as its own pure function (no shap import needed to exercise it) so
-    it can be unit-tested without the library installed, which matters
-    because it was never exercised at all on the one platform where SHAP is
-    actually importable (see docs/03_arquitetura.md, section 3.6: shap
-    fails to build on this project's Windows ARM64 dev machine). Running
-    for real on the Linux x86-64 test server surfaced the bug this function
-    fixes: multi-class TreeExplainer output changed, across SHAP versions,
-    from a list of one (n_samples, n_features) array per class to a single
-    (n_samples, n_features, n_classes) array -- code written only against
+    it can be unit-tested without the library installed. Running the real
+    explainability run surfaced the bug this function fixes: multi-class
+    TreeExplainer output changed, across SHAP versions, from a list of one
+    (n_samples, n_features) array per class to a single
+    (n_samples, n_features, n_classes) array; code written only against
     the list form silently produced a 2-D "mean" (features x classes)
     instead of a 1-D per-feature vector, which crashed one level up when
     that got zipped into a DataFrame column.
@@ -73,6 +69,30 @@ def _aggregate_shap_values(shap_values) -> np.ndarray:
     if values.ndim == 3:
         return np.abs(values).mean(axis=(0, 2))
     return np.abs(values).mean(axis=0)
+
+
+def local_shap_values_for_class(shap_values, class_idx: int) -> np.ndarray:
+    """Extract one instance's per-feature SHAP values for a single class,
+    from a TreeExplainer call on exactly one row, regardless of which of
+    the same three output shapes ``_aggregate_shap_values`` handles the
+    caller got back.
+
+    Unlike that function (a global mean-|value| across all instances and
+    classes), this keeps the sign and picks out one specific class, which
+    is what a local, per-prediction explanation needs. Written after the
+    same class of bug surfaced twice: code that only handled the old
+    "list of one (n_samples, n_features) array per class" shape silently
+    mis-indexed the newer single (n_samples, n_features, n_classes) array
+    (slicing off the first *feature*, not the first *instance*), producing
+    a per-class vector instead of a per-feature one and corrupting the
+    endpoint response instead of raising.
+    """
+    if isinstance(shap_values, list):
+        return np.asarray(shap_values[class_idx])[0]
+    values = np.asarray(shap_values)
+    if values.ndim == 3:
+        return values[0, :, class_idx]
+    return values[0]
 
 
 def shap_global_importance(
@@ -97,7 +117,7 @@ def lime_explain_instance(
     model, X_train: pd.DataFrame, instance: pd.Series, class_names: list[str], num_features: int = 10
 ):
     """Local explanation for a single prediction via LIME's tabular
-    explainer -- always available (pure Python), used both for the
+    explainer; always available (pure Python), used both for the
     technical presentation and as a sanity cross-check against SHAP's local
     attributions when both are present."""
     from lime.lime_tabular import LimeTabularExplainer

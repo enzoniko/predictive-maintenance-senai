@@ -1,6 +1,6 @@
 # Default configuration for the predictive-maintenance pipeline.
 # All paths are relative to the repository root and resolved with pathlib,
-# so this file works unchanged on Windows and Linux.
+# so this file works unchanged across operating systems.
 
 paths:
   raw_dir: "data/raw"
@@ -62,7 +62,7 @@ drift:
 
 imbalance:
   # Realistic operating prior used to re-weight the held-out test set when
-  # reporting metrics -- the 50/50/50/50/50 split in the case data is curated,
+  # reporting metrics: the 50/50/50/50/50 split in the case data is curated,
   # not representative of a real fleet where healthy operation dominates.
   simulated_prior:
     "Classe A": 0.70

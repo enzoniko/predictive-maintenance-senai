@@ -44,7 +44,7 @@ def test_conformal_achieves_approximately_target_coverage(method: str) -> None:
 def test_aps_abstention_rate_is_in_line_with_alpha() -> None:
     # Randomized APS *can* produce an empty set (see conformal.py's module
     # docstring): an empty set is always a non-coverage event, so its rate
-    # should stay roughly within the alpha = 1 - target_coverage budget,
+    # should stay roughly within the alpha = 1; target_coverage budget,
     # not dominate it.
     proba_calib, y_calib = _synthetic_calibrated_probs(1000, seed=0)
     proba_test, _ = _synthetic_calibrated_probs(500, seed=1)
@@ -77,7 +77,7 @@ def test_coverage_by_class_and_average_set_size_are_well_formed() -> None:
     assert set(per_class) == set(CLASSES)
     # Randomized APS can occasionally abstain (empty set), so the average
     # set size is not bounded below by 1 the way the deterministic variant
-    # would be -- only that it stays within a sane range overall.
+    # would be; only that it stays within a sane range overall.
     assert 0.5 <= average_set_size(sets) <= 3.0
 
 

@@ -1,9 +1,8 @@
 """Experiment tracking, with a local fallback when MLflow is unavailable.
 
-``mlflow`` needs ``pyarrow``, which has no prebuilt wheel for Windows
-ARM64 and fails to build there without a C/C++ toolchain (confirmed on this
-dev machine; installs fine on the Linux x86-64 test server -- see
-docs/03_arquitetura.md, "Platform notes"). Rather than make MLflow a hard
+``mlflow`` needs ``pyarrow``, which requires a C/C++ toolchain to build
+from source and is not available in every environment (see
+docs/03_arquitetura.md, section 3.6). Rather than make MLflow a hard
 requirement for running this pipeline at all, ``get_tracker()`` returns an
 MLflow-backed tracker when importable and a small local JSON+joblib
 tracker otherwise, with the same three-method interface. Every run is

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate standalone PNG figures for the slide decks and the
-Architecture+Schedule PDF -- reuses the same audit/pipeline/evaluation code
+Architecture+Schedule PDF. Reuses the same audit/pipeline/evaluation code
 the notebooks call, so these figures never drift from what the pipeline
 actually measured.
 
@@ -38,9 +38,9 @@ ACCENT = "#C44E52"
 GOOD = "#55A868"
 
 
-def save(fig, name: str) -> None:
+def save(fig, name: str, dpi: int | None = None) -> None:
     path = OUT / name
-    fig.savefig(path, bbox_inches="tight")
+    fig.savefig(path, bbox_inches="tight", dpi=dpi)
     plt.close(fig)
     print(f"wrote {path}")
 
@@ -82,7 +82,7 @@ def confusion_matrix_figure(bundle, holdout) -> None:
                      color="white" if cm.values[i, j] > cm.values.max() / 2 else "black")
     ax.set_xlabel("Predito")
     ax.set_ylabel("Verdadeiro")
-    ax.set_title(f"Matriz de confusão -- {bundle.model_name}")
+    ax.set_title(f"Matriz de confusão: {bundle.model_name}")
     save(fig, "confusion_matrix.png")
 
 
@@ -151,55 +151,131 @@ def controls_figure(bundle) -> None:
 
 def gantt_figure() -> None:
     phases = [
-        ("Fase 0 - Requisitos", 0, 1, "#4C72B0"),
-        ("Fase 1 - Entendimento", 1, 1, "#4C72B0"),
-        ("Fase 2 - Baseline", 2, 2, "#55A868"),
-        ("Fase 3 - Pesquisa avançada", 3, 3, "#DD8452"),
-        ("Fase 4 - Integração e piloto", 6, 1.5, "#8172B2"),
-        ("Fase 5 - Validação de campo", 7.5, 1, "#C44E52"),
-        ("Fase 6 - Acompanhamento", 8.5, 3, "#8C8C8C"),
+        ("Fase 0: Requisitos", 0, 1, "#4C72B0"),
+        ("Fase 1: Entendimento", 1, 1, "#4C72B0"),
+        ("Fase 2: Baseline", 2, 2, "#55A868"),
+        ("Fase 3: Integração e piloto", 4, 2, "#8172B2"),
+        ("Fase 4: Validação de campo", 6, 1, "#C44E52"),
+        ("Fase 5: Acompanhamento", 7, 2, "#8C8C8C"),
+        ("Trilha de pesquisa interna\n(equipe de IA do SENAI, paralela)", 2, 3, "#DD8452"),
     ]
-    fig, ax = plt.subplots(figsize=(9, 4))
-    for i, (name, start, dur, color) in enumerate(phases):
+    fig, ax = plt.subplots(figsize=(9, 4.2))
+    for name, start, dur, color in phases:
         ax.barh(name, dur, left=start, color=color, height=0.6)
     ax.set_xlabel("Mês do projeto")
-    ax.set_xlim(0, 12)
-    ax.set_title("Cronograma de execução -- 9 meses (Fase 6 inicia sustentação contínua)")
+    ax.set_xlim(0, 9)
+    ax.set_title("Cronograma de execução: 9 meses (Fase 5 inicia sustentação contínua)")
     ax.invert_yaxis()
     save(fig, "gantt_chart.png")
 
 
 def architecture_figure() -> None:
-    fig, ax = plt.subplots(figsize=(10, 5.5))
+    fig, ax = plt.subplots(figsize=(11, 6.2))
     ax.axis("off")
     boxes = {
-        "Banco do cliente\n(automação/software)": (0.05, 0.55, 0.18, 0.22, "#8C8C8C"),
-        "Ingestão\n(loader + audit)": (0.30, 0.55, 0.18, 0.22, PRIMARY),
-        "Pré-proc. + Features\n(tempo/freq/wavelet)": (0.55, 0.55, 0.20, 0.22, PRIMARY),
-        "Modelo + Conformal\n(ModelBundle)": (0.55, 0.20, 0.20, 0.22, GOOD),
-        "API (FastAPI)": (0.30, 0.20, 0.18, 0.22, GOOD),
-        "Banco de predições\n/auditoria/drift": (0.05, 0.20, 0.18, 0.22, "#8C8C8C"),
-        "Dashboard\n(Streamlit)": (0.80, 0.20, 0.16, 0.22, "#DD8452"),
+        "Banco do cliente\n(automação/software)\nsensores + placas": (0.03, 0.55, 0.18, 0.26, "#8C8C8C"),
+        "Ingestão\nloader.py + audit.py\nschema, Kruskal-Wallis, MI": (0.28, 0.55, 0.20, 0.26, PRIMARY),
+        "Features\ntempo + frequência + wavelet\nbuilder.py (fit/transform)": (0.55, 0.55, 0.20, 0.26, PRIMARY),
+        "Modelo + Conformal\nModelBundle (joblib)": (0.55, 0.16, 0.20, 0.26, GOOD),
+        "API (FastAPI)\n/predict /predict_batch\n/explain /audit /drift": (0.28, 0.16, 0.20, 0.26, GOOD),
+        "Banco de predições\n/auditoria/drift\nSQLite ou Postgres": (0.03, 0.16, 0.18, 0.26, "#8C8C8C"),
+        "Dashboard\nStreamlit\ntime de manutenção": (0.81, 0.16, 0.16, 0.26, "#DD8452"),
     }
     for label, (x, y, w, h, color) in boxes.items():
         ax.add_patch(plt.Rectangle((x, y), w, h, facecolor=color, edgecolor="black", alpha=0.85))
-        ax.text(x + w / 2, y + h / 2, label, ha="center", va="center", fontsize=9, color="white", weight="bold")
+        ax.text(x + w / 2, y + h / 2, label, ha="center", va="center", fontsize=8.5, color="white", weight="bold")
 
     arrows = [
-        ((0.23, 0.66), (0.30, 0.66)),
-        ((0.48, 0.66), (0.55, 0.66)),
+        ((0.21, 0.68), (0.28, 0.68)),
+        ((0.48, 0.68), (0.55, 0.68)),
         ((0.65, 0.55), (0.65, 0.42)),
-        ((0.55, 0.31), (0.48, 0.31)),
-        ((0.30, 0.31), (0.23, 0.31)),
-        ((0.48, 0.31), (0.80, 0.31)),
+        ((0.55, 0.29), (0.48, 0.29)),
+        ((0.28, 0.29), (0.21, 0.29)),
+        ((0.48, 0.29), (0.81, 0.29)),
     ]
     for (x0, y0), (x1, y1) in arrows:
         ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
                      arrowprops=dict(arrowstyle="->", lw=1.5, color="black"))
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    ax.set_title("Arquitetura do sistema (ver docs/03_arquitetura.md para diagramas C4 completos)")
+    ax.set_title("Arquitetura do sistema (ver docs/03_arquitetura.md para os diagramas C4 completos)")
     save(fig, "architecture_overview.png")
+
+
+def pipeline_detail_figure() -> None:
+    """A second, more granular diagram: the concrete steps inside the
+    training pipeline (python -m pdm.cli train), one level below the
+    component-level architecture_overview.png above.
+    """
+    fig, ax = plt.subplots(figsize=(16, 4.2))
+    ax.axis("off")
+    steps = [
+        ("Dados\nbrutos", "#8C8C8C"),
+        ("Auditoria\nestatística", PRIMARY),
+        ("Split\nestratificado", PRIMARY),
+        ("Limpeza\n(fit no treino)", PRIMARY),
+        ("Features\n(tempo/freq/\nwavelet)", PRIMARY),
+        ("Seleção de\nmodelo (CV)", GOOD),
+        ("Calibração\nconformal", GOOD),
+        ("ModelBundle", "#DD8452"),
+    ]
+    captions = [
+        ".npy / banco do cliente",
+        "Kruskal-Wallis + MI",
+        "80/10/10",
+        "Hampel, NaN, silêncio",
+        "CWT / synchrosqueezed",
+        "5-fold, 4 candidatos",
+        "LAC / APS",
+        "modelo + limpadores + metadados",
+    ]
+    n = len(steps)
+    box_w, box_h, gap = 0.105, 0.42, 0.02
+    total_w = n * box_w + (n - 1) * gap
+    x0 = (1 - total_w) / 2
+    y0 = 0.42
+    for i, ((label, color), caption) in enumerate(zip(steps, captions)):
+        x = x0 + i * (box_w + gap)
+        ax.add_patch(plt.Rectangle((x, y0), box_w, box_h, facecolor=color, edgecolor="black", alpha=0.88))
+        ax.text(x + box_w / 2, y0 + box_h / 2, label, ha="center", va="center",
+                fontsize=10, color="white", weight="bold")
+        ax.text(x + box_w / 2, y0 - 0.05, caption, ha="center", va="top",
+                fontsize=7.3, color="#333333", wrap=True)
+        if i < n - 1:
+            ax.annotate("", xy=(x + box_w + gap, y0 + box_h / 2), xytext=(x + box_w, y0 + box_h / 2),
+                        arrowprops=dict(arrowstyle="->", lw=1.4, color="black"))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_title("Pipeline de treino em detalhe (python -m pdm.cli train), ver docs/03_arquitetura.md seção 3.3")
+    save(fig, "pipeline_detail.png")
+
+
+def wavelet_feature_figure(dataset, fs: int, window_len: int) -> None:
+    """Visualizes the wavelet feature-extraction step directly: a CWT
+    scalogram of one real window per class, on the sensor with the largest
+    amplitude among the three retained. Mirrors the analysis in
+    notebooks/01_data_audit_and_signal_analysis.ipynb.
+    """
+    import pywt
+
+    sensor = "Dados_2"
+    scales = np.geomspace(1, 128, 60)
+    class_names = sorted(set(dataset.labels.tolist()))
+    fig, axes = plt.subplots(1, len(class_names), figsize=(16, 3.2), sharey=True)
+    for ax, cls in zip(axes, class_names):
+        idx = np.where(dataset.labels == cls)[0][0]
+        row = dataset.sensors[sensor][idx]
+        coeffs, cwt_freqs = pywt.cwt(row, scales, "morl", sampling_period=1 / fs)
+        ax.imshow(
+            np.abs(coeffs), aspect="auto",
+            extent=[0, window_len / fs * 1000, cwt_freqs[-1], cwt_freqs[0]],
+            cmap="magma",
+        )
+        ax.set_title(cls, fontsize=9)
+        ax.set_xlabel("ms")
+    axes[0].set_ylabel("Hz (aprox.)")
+    fig.suptitle(f"Escalograma CWT (Morlet): {sensor}, uma janela de exemplo por classe", y=1.05)
+    save(fig, "wavelet_scalogram.png", dpi=90)
 
 
 def main() -> None:
@@ -210,6 +286,8 @@ def main() -> None:
     sensor_verdict_figure(report)
     gantt_figure()
     architecture_figure()
+    pipeline_detail_figure()
+    wavelet_feature_figure(dataset, dataset.sample_rate_hz, dataset.window_len)
 
     bundle_path = cfg.paths.models_dir / BUNDLE_FILENAME
     if bundle_path.exists():
@@ -221,7 +299,7 @@ def main() -> None:
         robustness_figure(bundle, holdout)
         controls_figure(bundle)
     else:
-        print(f"No bundle at {bundle_path} -- skipping model-dependent figures.")
+        print(f"No bundle at {bundle_path}, skipping model-dependent figures.")
 
 
 if __name__ == "__main__":

@@ -1,14 +1,16 @@
-# 6. Track de pesquisa
+# 6. Track de pesquisa (plano interno da equipe de IA do SENAI SC)
 
-Manutenção preditiva de máquinas rotativas é uma área madura, mas isso não significa que o problema deste cliente esteja resolvido — significa que existe uma literatura sólida para não reinventar o básico, e uma fronteira ativa (aprendizado com poucos dados de falha, robustez a domínio, incerteza calibrada) onde ainda há ganho real de pesquisa. Este documento define os **gaps** identificados, as **hipóteses** de pesquisa associadas e o **protocolo experimental** para testá-las — deliberadamente separado da entrega da prévia, para não misturar "o que já sabemos que funciona" com "o que vale a pena investigar".
+Este documento é interno à equipe de IA do SENAI SC, não parte do escopo contratado pelo cliente (ver `04_cronograma_9_meses.md`, seção 4.5, para onde essa trilha entra no cronograma e por quê). O cronograma e a proposta que vão para o cliente entregam um pipeline interpretável, validado e integrado, sem depender de nenhuma hipótese abaixo: quem contrata manutenção preditiva quer o problema resolvido, não necessariamente estado da arte publicável. Mantê-las aqui, separadas, é o que permite ao time de IA continuar avançando cientificamente sem transformar isso numa exigência ou num risco de prazo para o cliente.
+
+Manutenção preditiva de máquinas rotativas é uma área madura, mas isso não significa que o problema deste cliente esteja resolvido. Significa que existe uma literatura sólida para não reinventar o básico, e uma fronteira ativa (aprendizado com poucos dados de falha, robustez a domínio, incerteza calibrada) onde ainda há ganho real de pesquisa. Este documento define os **gaps** identificados, as **hipóteses** de pesquisa associadas e o **protocolo experimental** para testá-las.
 
 ## 6.1 Gaps identificados
 
-- **G1 — Janela curta, sem RPM**: 20 ms de janela e ausência de sinal de rotação impedem *order tracking* e separação fina de frequências de falha de rolamento (ver `01_interpretacao_problema.md`, seção 1.4). Qualquer técnica que dependa de resolução espectral fina para funcionar precisa ser revalidada quando dados de melhor resolução estiverem disponíveis.
-- **G2 — Regime de poucos dados de falha**: o conjunto do case está artificialmente balanceado; uma planta real tem abundância de dados saudáveis e escassez de exemplos de cada tipo de falha. O pipeline desta prévia é supervisionado e assume rótulos abundantes para todas as classes — isso não se sustenta em produção sem adaptação.
-- **G3 — Falhas nunca vistas**: um classificador fechado (softmax sobre classes conhecidas) não tem mecanismo nativo para dizer "isto não é nenhuma das classes que eu conheço".
-- **G4 — Ausência de modelo físico validado**: sem confirmação do tipo exato de motor/rolamento/acoplamento, não é possível hoje incorporar equações físicas específicas (frequências de falha teóricas, modelo de dinâmica rotativa) como viés indutivo.
-- **G5 — Wavelet/tempo-frequência subexplorado nesta prévia**: a prévia usa CWT (PyWavelets) para energia por escala; a versão *synchrosqueezed* (`ssqueezepy`, ver `03_arquitetura.md` seção 3.6) só foi validada no servidor Linux, não integrada ao modelo final por restrição de tempo/plataforma — fica como extensão natural de curto prazo.
+- **G1** (janela curta, sem RPM): 20 ms de janela e ausência de sinal de rotação impedem *order tracking* e separação fina de frequências de falha de rolamento (ver `01_interpretacao_problema.md`, seção 1.4). Qualquer técnica que dependa de resolução espectral fina para funcionar precisa ser revalidada quando dados de melhor resolução estiverem disponíveis.
+- **G2** (regime de poucos dados de falha): o conjunto do case está artificialmente balanceado; uma planta real tem abundância de dados saudáveis e escassez de exemplos de cada tipo de falha. O pipeline desta prévia é supervisionado e assume rótulos abundantes para todas as classes, o que não se sustenta em produção sem adaptação.
+- **G3** (falhas nunca vistas): um classificador fechado (softmax sobre classes conhecidas) não tem mecanismo nativo para dizer "isto não é nenhuma das classes que eu conheço".
+- **G4** (ausência de modelo físico validado): sem confirmação do tipo exato de motor, rolamento ou acoplamento, não é possível hoje incorporar equações físicas específicas (frequências de falha teóricas, modelo de dinâmica rotativa) como viés indutivo.
+- **G5** (wavelet/tempo-frequência subexplorado nesta prévia): a prévia usa CWT (PyWavelets) para energia por escala; a versão *synchrosqueezed* (`ssqueezepy`, ver `03_arquitetura.md` seção 3.6) foi implementada e validada, mas não integrada ao modelo final por restrição de tempo, ficando como extensão natural de curto prazo.
 
 ## 6.2 Hipóteses de pesquisa
 
@@ -26,17 +28,17 @@ Manutenção preditiva de máquinas rotativas é uma área madura, mas isso não
 ## 6.3 Protocolo experimental (comum a todas as hipóteses)
 
 1. **Baseline fixo**: toda hipótese é comparada contra o modelo desta prévia (HistGradientBoosting sobre features de tempo/frequência/wavelet), não contra um baseline artificialmente fraco.
-2. **Split por condição operacional**, não por janela aleatória, sempre que a informação de condição estiver disponível — evita que o modelo "decore" uma condição específica em vez de aprender o fenômeno.
+2. **Split por condição operacional**, não por janela aleatória, sempre que a informação de condição estiver disponível (evita que o modelo "decore" uma condição específica em vez de aprender o fenômeno).
 3. **Controles obrigatórios**: toda hipótese reporta o mesmo par de controles já usado na prévia (embaralhamento de rótulo, canal isolado sem sinal) antes de qualquer alegação de ganho.
 4. **Critério de promoção a produção**: uma técnica só substitui o componente correspondente do pipeline de produção se ganhar em robustez/generalização documentada **e** não piorar a interpretabilidade/latência abaixo dos requisitos não-funcionais (`02_engenharia_requisitos.md`).
 
 ## 6.4 Datasets públicos para viabilizar a pesquisa em paralelo (risco R1)
 
-Enquanto os requisitos de dados do cliente (RD-01–RD-07) não são plenamente atendidos, a evolução das hipóteses H1–H8 não precisa parar — datasets públicos de máquinas rotativas com configuração similar (vibração/corrente, múltiplos estados de falha) permitem continuar desenvolvendo e validando o pipeline:
+Enquanto os requisitos de dados do cliente (RD-01–RD-07) não são plenamente atendidos, a evolução das hipóteses H1–H8 não precisa parar: datasets públicos de máquinas rotativas com configuração similar (vibração/corrente, múltiplos estados de falha) permitem continuar desenvolvendo e validando o pipeline.
 
-- **CWRU Bearing Data Center** (Case Western Reserve University) — referência clássica de falha de rolamento.
-- **MFPT** (Machinery Failure Prevention Technology) — vibração de rolamento sob múltiplas cargas.
-- **Paderborn University Bearing Dataset** — inclui falhas reais (não só induzidas), corrente e vibração.
-- **MaFaulDa** (Machinery Fault Database, UFRJ) — vibração e áudio de máquina rotativa com desbalanceamento, desalinhamento e falha de rolamento, útil especialmente por já estar em português/contexto brasileiro.
+- **CWRU Bearing Data Center** (Case Western Reserve University): referência clássica de falha de rolamento.
+- **MFPT** (Machinery Failure Prevention Technology): vibração de rolamento sob múltiplas cargas.
+- **Paderborn University Bearing Dataset** (inclui falhas reais (não só induzidas), corrente e vibração).
+- **MaFaulDa** (Machinery Fault Database, UFRJ): vibração e áudio de máquina rotativa com desbalanceamento, desalinhamento e falha de rolamento, útil especialmente por já estar em português/contexto brasileiro.
 
 Essa é, em si, a mitigação prototipada do risco R1 em `05_riscos_e_mitigacoes.md`: o time de pesquisa não fica bloqueado esperando o cliente.

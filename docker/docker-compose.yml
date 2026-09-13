@@ -20,7 +20,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.api
     environment:
-      # Overrides configs/default.yaml's sqlite default -- see serving/db.py.
+      # Overrides configs/default.yaml's sqlite default; see serving/db.py.
       PDM_DATABASE_URL: postgresql+psycopg2://pdm:pdm@postgres:5432/pdm
     ports:
       - "8000:8000"

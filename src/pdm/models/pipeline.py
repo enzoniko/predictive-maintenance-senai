@@ -70,7 +70,7 @@ def stratified_three_way_split_indices(
     y: np.ndarray, split_cfg: dict, seed: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Split at the level of raw-window indices, *before* any feature is
-    computed -- see features/builder.py's module docstring for why cleaning
+    computed; see features/builder.py's module docstring for why cleaning
     thresholds must be fit after this split, not before it."""
     train_frac, calib_frac, test_frac = split_cfg["train"], split_cfg["calibration"], split_cfg["test"]
     assert abs(train_frac + calib_frac + test_frac - 1.0) < 1e-6
@@ -109,7 +109,7 @@ def evaluate_bundle_on_holdout(
     + model-selection steps ``run_training_pipeline`` needs. Used by
     notebooks/02 to reproduce the confusion matrix, calibration and
     robustness plots against real held-out data in seconds rather than
-    minutes -- the bundle's already-fitted cleaners make this possible.
+    minutes; the bundle's already-fitted cleaners make this possible.
     """
     dataset = dataset or load_sensor_dataset(config)
     _, _, idx_test = stratified_three_way_split_indices(dataset.labels, config.split, config.random_seed)
@@ -148,7 +148,7 @@ def run_training_pipeline(config: Config, dataset: SensorDataset | None = None) 
     idx_train, idx_calib, idx_test = stratified_three_way_split_indices(dataset.labels, config.split, seed)
 
     # Cleaning thresholds (saturation, silence) are fit on the training
-    # indices only, then reused unchanged for calibration and test -- see
+    # indices only, then reused unchanged for calibration and test; see
     # features/builder.py's module docstring.
     cleaners = fit_cleaners(dataset, config, audit_report.recommended_sensors, row_indices=idx_train)
 

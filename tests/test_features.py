@@ -41,7 +41,7 @@ def test_frequency_domain_features_locate_dominant_tone() -> None:
     df = frequency_domain_features(X, prefix="s1", fs=FS)
     assert np.isclose(df["s1_peak1_freq_hz"].iloc[0], 500, atol=50)
     assert np.isclose(df["s1_peak1_freq_hz"].iloc[1], 1500, atol=50)
-    # Bands should sum (approximately) to 1 -- they partition the spectrum.
+    # Bands should sum (approximately) to 1; they partition the spectrum.
     band_cols = [c for c in df.columns if "_band_" in c]
     assert np.allclose(df[band_cols].sum(axis=1), 1.0, atol=1e-6)
 

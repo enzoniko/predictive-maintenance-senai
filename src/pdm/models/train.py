@@ -2,13 +2,12 @@
 
 Model choice is deliberately conservative: a decision tree (fully legible
 rules, for stakeholders who need to see *why*), a random forest and a
-histogram gradient boosting classifier (both scikit-learn, no extra
-platform risk) and XGBoost (confirmed working on both Windows ARM64 and
-Linux x86-64 -- see docs/03_arquitetura.md). No deep-learning baseline is
+histogram gradient boosting classifier (both scikit-learn) and XGBoost.
+No deep-learning baseline is
 included in the preview: at 50k windows x ~150 engineered features this is
 not a data-scarce, representation-learning problem, and the interpretable
 models below already reach very high macro-F1 (see
-notebooks/03_feasibility_modeling.ipynb) -- a heavier model would trade
+notebooks/03_feasibility_modeling.ipynb); a heavier model would trade
 away exactly the auditability this project's research track (see
 docs/06_track_pesquisa.md) argues for.
 """
@@ -58,7 +57,7 @@ def get_candidate_models(seed: int) -> dict[str, object]:
     if XGBOOST_AVAILABLE:
         # `objective`/`eval_metric` are left unset so XGBoost auto-selects
         # between binary and multi-class variants from the encoded labels'
-        # cardinality -- hardcoding "multi:softprob" broke outright on a
+        # cardinality; hardcoding "multi:softprob" broke outright on a
         # 2-class label set during development (XGBoostError: num_class
         # must be >= 1), and a future project phase with a coarser
         # healthy/faulty label is exactly the kind of relabeling that would
@@ -120,7 +119,7 @@ def cross_validate_models(
 
 def label_mapping(y: np.ndarray) -> dict[str, int]:
     """Explicit, deterministic class -> integer mapping (alphabetical), used
-    instead of re-fitting a fresh sklearn LabelEncoder on every call -- that
+    instead of re-fitting a fresh sklearn LabelEncoder on every call; that
     would only coincidentally stay consistent across calls (it does, here,
     because "Classe A".."Classe E" sort the same alphabetically as they are
     conceptually ordered, but relying on that coincidence silently would be
@@ -141,7 +140,7 @@ class EncodedLabelClassifier:
     ``classes_``) every other model in this module already exposes.
     Without this, every downstream consumer (evaluation/imbalance.py,
     evaluation/robustness.py, evaluation/conformal.py, serving/api.py) would
-    need its own special case for "this one model returns integers" -- the
+    need its own special case for "this one model returns integers"; the
     wrapper contains that concern in one place instead.
     """
 

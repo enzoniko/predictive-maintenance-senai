@@ -33,7 +33,7 @@ def detrend(window: np.ndarray) -> np.ndarray:
 
 
 def hann_window(window: np.ndarray) -> np.ndarray:
-    """Apply a Hann taper -- reduces spectral leakage before an FFT."""
+    """Apply a Hann taper; reduces spectral leakage before an FFT."""
     return window * np.hanning(len(window))
 
 
@@ -62,7 +62,7 @@ def bandpass(window: np.ndarray, fs: int, low_hz: float, high_hz: float, order: 
 
 
 def hilbert_envelope(window: np.ndarray) -> np.ndarray:
-    """Amplitude envelope via the analytic signal -- the standard first step
+    """Amplitude envelope via the analytic signal; the standard first step
     of envelope-demodulation analysis for rolling-element bearing faults
     (typically applied after band-passing around a resonance, then this
     envelope's own spectrum is inspected for BPFO/BPFI lines)."""
@@ -80,7 +80,7 @@ class UnitConverter:
     """Converts raw-volt windows to physical units using configs/sensors.yaml.
 
     With every sensor's ``sensitivity`` still ``null`` (unknown transducer,
-    see configs/sensors.yaml), this is an identity operation today -- calling
+    see configs/sensors.yaml), this is an identity operation today; calling
     it makes that assumption explicit and auditable rather than silently
     treating volts as if they were already the physical quantity of
     interest. Once the client supplies sensitivities this class starts doing

@@ -3,7 +3,7 @@
 Bundling the fitted model together with its feature-column order, the class
 list, the sensors it expects, and (optionally) a calibrated conformal
 predictor means ``serving/api.py`` never has to guess these things or risk
-drifting out of sync with how the model was trained -- load one file, get a
+drifting out of sync with how the model was trained; load one file, get a
 consistent, versioned unit.
 """
 
@@ -50,13 +50,13 @@ class ModelBundle:
     window_len: int
     conformal: SplitConformalClassifier | None
     # Fitted on training-split rows only (see features/builder.py) and
-    # reused verbatim at inference time -- serving/api.py must not re-fit
+    # reused verbatim at inference time; serving/api.py must not re-fit
     # these against production traffic.
     cleaners: dict[str, SensorCleaner] = field(default_factory=dict)
     metrics: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    # Recorded at save() time so a failed load() -- see the note there about
-    # cross-version pickle incompatibility -- can at least be diagnosed
+    # Recorded at save() time so a failed load(); see the note there about
+    # cross-version pickle incompatibility; can at least be diagnosed
     # after the fact by comparing against a *successfully* loaded sibling
     # bundle, even though the failing load itself can't read this field
     # (the unpickling dies on the model object before reaching it).
@@ -65,7 +65,7 @@ class ModelBundle:
     def save(self, path: Path) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
         # Uncompressed, this HistGradientBoostingClassifier-based bundle
-        # weighed in at 5.8 MB -- on its own already over the case
+        # weighed in at 5.8 MB; on its own already over the case
         # submission's 5 MB-per-attachment limit once the repo is zipped.
         # joblib's zlib compression (level 9, the max) brings a real bundle
         # from this project down to ~2.9 MB with no change to what gets
@@ -78,16 +78,11 @@ class ModelBundle:
         try:
             bundle = joblib.load(path)
         except (ModuleNotFoundError, AttributeError, ImportError) as exc:
-            # Concretely reproduced across this project's own two training
-            # environments: a bundle trained under scikit-learn 1.9.1
-            # (Python 3.12, Windows ARM64 -- the only sklearn release with
-            # ARM64 Windows wheels at the time) fails with "No module named
-            # '_loss'" when loaded under scikit-learn 1.7.2 (Python 3.10,
-            # the newest sklearn compatible with that interpreter, on the
-            # Linux x86-64 deployment target) -- HistGradientBoosting's
-            # internal loss module moved between those releases. This is a
-            # Python-version-driven scikit-learn compatibility gap, not a
-            # Windows-vs-Linux one; see docs/03_arquitetura.md, section 3.6.
+            # Concretely reproduced against a bundle trained under a
+            # different scikit-learn release: it fails with "No module
+            # named '_loss'" when loaded under a version where
+            # HistGradientBoosting's internal loss module has moved;
+            # see docs/03_arquitetura.md, section 3.6.
             here = _current_environment()
             raise RuntimeError(
                 f"Could not load the model bundle at {path}: {exc}\n"

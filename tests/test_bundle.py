@@ -15,20 +15,17 @@ def test_current_environment_reports_the_running_interpreter() -> None:
 
 
 class _PicklableForTest:
-    """A real, importable class -- pickled successfully, then its module
+    """A real, importable class; pickled successfully, then its module
     reference is corrupted in the byte stream below so *unpickling* fails
     with ModuleNotFoundError, without needing two scikit-learn versions
     installed side by side to reproduce that failure mode."""
 
 
 def test_load_wraps_cross_version_unpickle_failures_with_a_clear_message(tmp_path: Path) -> None:
-    """Regression test: a bundle trained under scikit-learn 1.9.1 (Python
-    3.12, the only sklearn release with Windows ARM64 wheels at the time)
+    """Regression test: a bundle trained under one scikit-learn release
     failed with a bare 'ModuleNotFoundError: No module named _loss' when
-    loaded under scikit-learn 1.7.2 (Python 3.10, the newest sklearn
-    compatible with that interpreter, on this project's Linux x86-64
-    deployment target) -- HistGradientBoosting's internal loss module moved
-    between those releases. ModelBundle.load() must turn that into an
+    loaded under another; HistGradientBoosting's internal loss module
+    moved between releases. ModelBundle.load() must turn that into an
     actionable message naming this environment's own versions, rather than
     passing the raw pickle error through.
     """

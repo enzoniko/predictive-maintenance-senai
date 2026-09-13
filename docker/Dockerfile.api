@@ -1,22 +1,36 @@
-# Linux x86-64 image -- this is the deployment target (see README.md,
-# "Platform notes"): mlflow/streamlit/shap/ssqueezepy all install cleanly
-# here via prebuilt wheels, unlike on the Windows ARM64 dev machine.
-FROM python:3.11-slim
+# Linux x86-64 image: this is the deployment target (see README.md,
+# "Platform notes"): mlflow/shap/ssqueezepy all install cleanly here via
+# prebuilt wheels.
+FROM python:3.10-slim
 
 WORKDIR /app
 
 COPY requirements.txt pyproject.toml ./
-RUN pip install --no-cache-dir -r requirements.txt \
-    # Postgres driver: deliberately not in requirements.txt -- see the note
-    # at the bottom of that file for why.
-    && pip install --no-cache-dir psycopg2-binary
+# docker/wheelhouse (gitignored; regenerate with `pip download -d
+# docker/wheelhouse -r requirements.txt psycopg2-binary` on a machine with a
+# healthy pip cache) is used when it has real wheels in it: several
+# networks have hit repeated multi-minute read timeouts against PyPI
+# pulling the larger packages here (mlflow, ssqueezepy's numba dependency)
+# from inside the build, even though the same host installs them fine
+# outside Docker; installing offline from a pre-populated wheelhouse
+# sidesteps that without changing what gets installed. Falls back to a
+# normal networked install otherwise -- ``docker/wheelhouse/.gitkeep`` is
+# the only thing tracked in git, so a fresh clone always has *a*
+# directory to COPY, just no wheels in it.
+COPY docker/wheelhouse/ /wheelhouse/
+RUN if ls /wheelhouse/*.whl >/dev/null 2>&1; then \
+        pip install --no-cache-dir --no-index --find-links=/wheelhouse -r requirements.txt psycopg2-binary; \
+    else \
+        pip install --no-cache-dir --timeout 120 --retries 8 -r requirements.txt && \
+        pip install --no-cache-dir --timeout 120 --retries 8 psycopg2-binary; \
+    fi
 
 COPY src/ src/
 COPY configs/ configs/
 RUN pip install --no-cache-dir -e .
 
 # Populated by the training pipeline (`python -m pdm.cli train`) before the
-# image is built, or mounted at runtime -- see docker-compose.yml.
+# image is built, or mounted at runtime; see docker-compose.yml.
 COPY models/ models/
 
 EXPOSE 8000

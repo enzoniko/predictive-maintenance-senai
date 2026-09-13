@@ -9,7 +9,7 @@ Two entry points, deliberately kept separate:
 * ``fit_cleaners`` + ``build_features_from_raw`` split that into a fit step
   (thresholds learned from training rows only) and a transform step
   (applied to train/calibration/test independently). ``models/pipeline.py``
-  uses this pair -- fitting cleaning thresholds on the full dataset before
+  uses this pair; fitting cleaning thresholds on the full dataset before
   splitting would leak calibration/test information into a value baked
   directly into the features the model trains on, which is exactly the kind
   of blind trust this project's data-audit ethos (see
@@ -66,7 +66,7 @@ def build_features_from_raw(
     include_wavelet: bool = True,
 ) -> tuple[pd.DataFrame, np.ndarray]:
     """Apply already-fitted cleaners and extract features. Returns
-    ``(feature_table_without_label, is_silent_mask)`` -- the caller attaches
+    ``(feature_table_without_label, is_silent_mask)``; the caller attaches
     whatever label array corresponds to these rows."""
     feature_frames: list[pd.DataFrame] = []
     silent_masks: list[np.ndarray] = []
@@ -90,10 +90,10 @@ def build_feature_table(
     sensors: list[str] | None = None,
     include_wavelet: bool = True,
 ) -> pd.DataFrame:
-    """Fit cleaners and build features from the same (whole) dataset -- see
+    """Fit cleaners and build features from the same (whole) dataset; see
     the module docstring for when this is (and is not) the right choice.
 
-    ``sensors`` is normally the audit's ``recommended_sensors`` -- passing an
+    ``sensors`` is normally the audit's ``recommended_sensors``; passing an
     explicit list keeps this function decoupled from the audit, so a
     notebook can still ask "what if I fed it Dados_4 too?" without editing
     this module.

@@ -112,11 +112,11 @@ def train_cmd(
     try:
         # mlflow.sklearn.log_model expects a real scikit-learn estimator;
         # models/train.py::EncodedLabelClassifier (the XGBoost wrapper) is
-        # not one, so this is best-effort -- the ModelBundle joblib file
+        # not one, so this is best-effort; the ModelBundle joblib file
         # (already saved above) remains the source of truth serving/api.py
         # actually loads, regardless of whether this logging step succeeds.
         tracker.log_model(run_id, artifacts.bundle.model)
-    except Exception as exc:  # noqa: BLE001 -- deliberately broad, see comment above
+    except Exception as exc:  # noqa: BLE001; deliberately broad, see comment above
         typer.echo(f"Warning: could not log the model artifact to the tracker ({exc})")
     typer.echo(f"Logged to {'MLflow' if MLFLOW_AVAILABLE else 'local tracker'} (run {run_id}) "
                f"under {cfg.paths.models_dir / 'runs'}")
@@ -126,7 +126,7 @@ def train_cmd(
     typer.echo(f"Test ECE: {artifacts.test_calibration.expected_calibration_error:.4f}")
     typer.echo(f"Conformal coverage @ target {cfg.conformal['target_coverage']}: "
                f"{artifacts.conformal_coverage:.4f} (avg set size {artifacts.conformal_avg_set_size:.2f})")
-    typer.echo(f"Controls -- label shuffle F1: {artifacts.label_shuffle_control_f1:.4f}, "
+    typer.echo(f"Controls; label shuffle F1: {artifacts.label_shuffle_control_f1:.4f}, "
                f"excluded-sensor F1: {artifacts.noise_sensor_control_f1:.4f} (chance ~= "
                f"{1 / len(artifacts.bundle.classes):.4f})")
     typer.echo(f"Bundle saved to {out_path}")
@@ -138,14 +138,14 @@ def evaluate_cmd(
     bundle_path: Path = typer.Option(None, help="Path to a saved model bundle"),
 ) -> None:
     """Print the evaluation summary for a saved bundle (re-runs the pipeline
-    if no cached artifacts are found -- see also `python -m pdm.cli train`,
+    if no cached artifacts are found; see also `python -m pdm.cli train`,
     which prints the same summary right after training)."""
     from pdm.models.bundle import BUNDLE_FILENAME, ModelBundle
 
     cfg = load_config(config_path)
     path = bundle_path or (cfg.paths.models_dir / BUNDLE_FILENAME)
     if not path.exists():
-        typer.echo(f"No bundle at {path} -- run `python -m pdm.cli train` first.")
+        typer.echo(f"No bundle at {path}; run `python -m pdm.cli train` first.")
         raise typer.Exit(1)
 
     bundle = ModelBundle.load(path)

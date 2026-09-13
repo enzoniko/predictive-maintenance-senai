@@ -1,10 +1,18 @@
 # See Dockerfile.api for why this targets Linux x86-64.
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 WORKDIR /app
 
 COPY requirements.txt pyproject.toml ./
-RUN pip install --no-cache-dir -r requirements.txt
+# See Dockerfile.api for why an offline install from docker/wheelhouse is
+# preferred when it has real wheels in it, falling back to a networked
+# install with extra patience otherwise.
+COPY docker/wheelhouse/ /wheelhouse/
+RUN if ls /wheelhouse/*.whl >/dev/null 2>&1; then \
+        pip install --no-cache-dir --no-index --find-links=/wheelhouse -r requirements.txt; \
+    else \
+        pip install --no-cache-dir --timeout 120 --retries 8 -r requirements.txt; \
+    fi
 
 COPY src/ src/
 COPY configs/ configs/

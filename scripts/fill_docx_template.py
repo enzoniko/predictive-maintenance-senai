@@ -6,7 +6,7 @@ Usage:
     python scripts/fill_docx_template.py <template.docx> <output.docx>
 
 The template's own text (the case statement, evaluation criteria, etc.) is
-left untouched -- this script only (a) fills the "Nome Completo / E-mail /
+left untouched; this script only (a) fills the "Nome Completo / E-mail /
 CPF" table and (b) appends the candidate's answer as new sections after the
 template's final paragraph.
 """
@@ -41,7 +41,7 @@ def fill_candidate_fields(doc: Document) -> None:
             if "CPF" in second_row:
                 table.rows[1].cells[3].text = CANDIDATE_CPF
             return
-    print("WARNING: candidate-fields table not found -- fill Nome/E-mail/CPF manually.",
+    print("WARNING: candidate-fields table not found; fill Nome/E-mail/CPF manually.",
           file=sys.stderr)
 
 
@@ -92,11 +92,11 @@ def append_answer(doc: Document) -> None:
         "5 arquivos de sensores, 3 (Dados_1-3) carregam sinal real e discriminam as 5 classes "
         "com significância estatística; Dados_4 está travado num valor quase constante "
         "(sensor morto/mal cabeado) e Dados_5 é estatisticamente indistinguível de ruído "
-        "branco em relação às classes -- ambos excluídos com teste de Kruskal-Wallis + "
+        "branco em relação às classes, ambos excluídos com teste de Kruskal-Wallis e "
         "permutação de informação mútua, não por inspeção visual. Uma coluna extra presente "
         "em Dados_1-3 (201ª, quase inteiramente vazia) foi identificada como artefato de "
         "exportação e descartada com validação. As 5 classes vêm artificialmente balanceadas "
-        "(10.000 janelas cada), padrão que não ocorre numa planta real -- a avaliação final "
+        "(10.000 janelas cada), padrão que não ocorre numa planta real, e a avaliação final "
         "reamostra o teste sob um prior de classes realista. Detalhes completos: "
         "docs/01_interpretacao_problema.md e docs/07_perguntas_ao_cliente.md (perguntas em "
         "aberto para o cliente).",
@@ -113,77 +113,69 @@ def append_answer(doc: Document) -> None:
         "explicabilidade) -> ModelBundle versionado -> API FastAPI (/predict, /predict_batch, "
         "/explain, /audit, /drift, /health) -> banco de dados (SQLite local / Postgres via "
         "Docker) -> dashboard Streamlit. O banco de dados desta camada de IA armazena apenas "
-        "o que a IA produz (predições, auditorias, relatórios de drift) -- não duplica o "
+        "o que a IA produz (predições, auditorias, relatórios de drift), não duplica o "
         "histórico bruto de sensores, que permanece no banco já modelado pelo time de "
         "software do cliente. Diagramas completos (contexto, containers, sequência de "
         "inferência): docs/03_arquitetura.md.",
     )
     add_paragraph(
         doc,
-        "Desenvolvido em Windows ARM64 e validado continuamente num servidor Linux x86-64 -- "
-        "os dois alvos de implantação. Toda dependência que falha numa plataforma "
-        "(mlflow, streamlit, shap, ssqueezepy, psycopg2, pyarrow) tem fallback documentado e "
+        "Implantação alvo: Linux x86-64. Toda dependência opcional que exige toolchain de "
+        "compilação (mlflow, shap, ssqueezepy, psycopg2, pyarrow) tem fallback documentado e "
         "testado: ver docs/03_arquitetura.md, seção 3.6.",
     )
 
-    add_heading(doc, "3. Cronograma de execução (caso contratado) -- 9 meses", level=1)
+    add_heading(doc, "3. Cronograma de execução (caso contratado): 9 meses", level=1)
     add_bullets(
         doc,
         [
-            "Fase 0 (mês 1) -- Kick-off e requisitos: semântica das classes, unidade física "
+            "Fase 0 (mês 1): Kick-off e requisitos, semântica das classes, unidade física "
             "dos sensores, acesso ao banco de dados do cliente.",
-            "Fase 1 (mês 2) -- Entendimento: revisão de literatura, auditoria de dados no "
+            "Fase 1 (mês 2): Entendimento, revisão de literatura, auditoria de dados no "
             "banco real do cliente.",
-            "Fase 2 (meses 3-4) -- Baseline interpretável: features físicas + modelo "
+            "Fase 2 (meses 3-4): Baseline interpretável, features físicas e modelo "
             "auditável, validado com o time de manutenção.",
-            "Fase 3 (meses 4-6, paralelo) -- Pesquisa avançada: physics-informed, "
-            "open-set/não-supervisionado, predição conformal em produção.",
-            "Fase 4 (meses 6-7) -- Integração: API + banco + dashboard, piloto numa máquina.",
-            "Fase 5 (mês 8) -- Validação de campo e transferência de conhecimento.",
-            "Fase 6 (mês 9+) -- Acompanhamento contínuo: drift, retrain, evolução.",
+            "Fase 3 (meses 5-6): Integração, API, banco de dados e dashboard em produção, "
+            "piloto controlado numa máquina real.",
+            "Fase 4 (mês 7): Validação de campo e transferência de conhecimento ao time do "
+            "cliente.",
+            "Fase 5 (meses 8-9 em diante): Acompanhamento contínuo (drift, retrain, "
+            "evolução), como contrato de sustentação.",
         ],
     )
     add_paragraph(
         doc,
-        "WBS, esforço estimado por fase e Gantt completo: docs/04_cronograma_9_meses.md.",
+        "WBS, esforço estimado por fase e Gantt completo: docs/04_cronograma_9_meses.md. "
+        "Nenhuma fase acima depende de pesquisa avançada para ser entregue; a Fase 2 já "
+        "produz um baseline interpretável validado com o time de manutenção, e as Fases 3 e "
+        "4 o colocam em produção com API, banco de dados, dashboard e piloto real.",
     )
 
-    add_heading(doc, "4. Riscos e track de pesquisa", level=1)
+    add_heading(doc, "4. Riscos", level=1)
     add_paragraph(
         doc,
         "Dez riscos priorizados (dados insuficientes, sensores em falha, desbalanceamento "
         "real, falhas nunca vistas, drift de conceito, resistência de adoção, overfitting ao "
-        "conjunto curado, escala, portabilidade de dependências, disponibilidade do cliente) "
-        "-- a maioria já com o mecanismo de mitigação prototipado no código, não apenas "
+        "conjunto curado, escala, portabilidade de dependências, disponibilidade do cliente), "
+        "a maioria já com o mecanismo de mitigação prototipado no código, não apenas "
         "planejado. Ver docs/05_riscos_e_mitigacoes.md.",
-    )
-    add_paragraph(
-        doc,
-        "O track de pesquisa (docs/06_track_pesquisa.md) formaliza 8 hipóteses -- modelos "
-        "informados por física, aprendizado não/semi/auto-supervisionado para o regime real "
-        "de poucos dados de falha, reconhecimento open-set e predição conformal recalibrada "
-        "em produção -- fundamentadas em publicações do autor sobre diagnóstico de máquinas "
-        "rotativas (IEEE IECON 2025, IEEE Access 2026), com datasets públicos (CWRU, MFPT, "
-        "Paderborn, MaFaulDa) propostos para viabilizar a pesquisa em paralelo caso os dados "
-        "do cliente demorem a ficar prontos.",
     )
 
     add_heading(doc, "5. Resultados da prévia técnica", level=1)
     add_paragraph(
         doc,
         "Modelo final (HistGradientBoosting, vencedor da validação cruzada entre 4 "
-        "candidatos, nas duas plataformas testadas): execução completa no servidor Linux "
-        "x86-64 com a stack de pesquisa inteira (MLflow, SHAP, ssqueezepy) atinge "
-        "F1-macro = 0,962 em teste nunca visto, erro de calibração esperado (ECE) = 0,006, "
-        "cobertura de predição conformal = 0,894 contra um alvo configurado de 0,90 "
-        "(tamanho médio do conjunto: 0,98 -- quase sempre uma única classe confiante). "
-        "Dois controles de sanidade confirmam ausência de vazamento: rótulos embaralhados "
-        "ficam em F1 = 0,200 (exatamente o acaso teórico); um modelo treinado só no sensor "
-        "de ruído excluído fica em F1 = 0,067, abaixo até do acaso. Testes de robustez "
-        "(remoção de sensor, remoção de grupo de features) e explicabilidade (SHAP real) "
-        "completam a avaliação. Reprodutível via `python -m pdm.cli train` e detalhado "
-        "nos notebooks 01-03 e em docs/01_interpretacao_problema.md e "
-        "docs/03_arquitetura.md (seção 3.7, validação cruzada de plataforma).",
+        "candidatos): execução completa com a stack de pesquisa inteira (MLflow, SHAP, "
+        "ssqueezepy) atinge F1-macro = 0,962 em teste nunca visto, erro de calibração "
+        "esperado (ECE) = 0,006, cobertura de predição conformal = 0,894 contra um alvo "
+        "configurado de 0,90 (tamanho médio do conjunto: 0,98, quase sempre uma única "
+        "classe confiante). Dois controles de sanidade confirmam ausência de vazamento: "
+        "rótulos embaralhados ficam em F1 = 0,200 (exatamente o acaso teórico); um modelo "
+        "treinado só no sensor de ruído excluído fica em F1 = 0,067, abaixo até do acaso. "
+        "Testes de robustez (remoção de sensor, remoção de grupo de features) e "
+        "explicabilidade (SHAP real) completam a avaliação. Reprodutível via "
+        "`python -m pdm.cli train` e detalhado nos notebooks 01-03 e em "
+        "docs/01_interpretacao_problema.md e docs/03_arquitetura.md (seção 3.7).",
     )
 
     add_heading(doc, "6. Links", level=1)
@@ -211,7 +203,7 @@ def main() -> int:
     doc.save(str(out_path))
     print(f"Wrote {out_path}")
     if not CANDIDATE_CPF:
-        print("REMINDER: CPF field left blank -- fill it in Word before submitting.")
+        print("REMINDER: CPF field left blank; fill it in Word before submitting.")
     return 0
 
 

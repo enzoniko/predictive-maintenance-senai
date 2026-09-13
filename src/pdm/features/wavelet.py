@@ -5,17 +5,15 @@ Two implementations, on purpose:
 
 * ``cwt_scale_energy_features`` uses PyWavelets (pure C extension, ships
   prebuilt wheels everywhere this project targets) for a Morlet CWT energy
-  distribution across scales -- always available, always the baseline.
+  distribution across scales; always available, always the baseline.
 * ``ssq_ridge_features`` uses ``ssqueezepy`` for a synchrosqueezed CWT and a
   simple ridge extraction, giving a much sharper time-frequency
-  localization (useful for both features and visualization -- see
+  localization (useful for both features and visualization; see
   notebooks/02_signal_analysis.ipynb). ``ssqueezepy`` pulls in
-  numba/llvmlite, which need a C/C++ toolchain to build from source; no
-  prebuilt wheel exists for Windows ARM64 at the time of writing, so this
-  path is wrapped in a guarded optional import (``SSQUEEZEPY_AVAILABLE``)
-  and was validated on the Linux x86-64 test server instead (see
-  docs/03_arquitetura.md, "Platform notes"). Callers must not assume the
-  ridge columns are always present.
+  numba/llvmlite, which need a C/C++ toolchain to build from source, so
+  this path is wrapped in a guarded optional import
+  (``SSQUEEZEPY_AVAILABLE``, see docs/03_arquitetura.md, section 3.6).
+  Callers must not assume the ridge columns are always present.
 """
 
 from __future__ import annotations
@@ -80,7 +78,7 @@ def ssq_ridge_features(X: np.ndarray, prefix: str, fs: int) -> pd.DataFrame | No
     """Synchrosqueezed-CWT ridge frequency (mean/std) per window.
 
     Returns None if ssqueezepy is not importable in the current
-    environment -- callers (features/builder.py) treat that as "these
+    environment; callers (features/builder.py) treat that as "these
     columns are unavailable here", not as an error.
     """
     if not SSQUEEZEPY_AVAILABLE:

@@ -1,8 +1,8 @@
 """Configuration loading.
 
 Every path in configs/default.yaml is relative to the repository root and is
-resolved with pathlib, so the same config works unchanged on Windows and
-Linux -- no hardcoded separators anywhere in this package.
+resolved with pathlib, so the same config works unchanged across operating
+systems, with no hardcoded separators anywhere in this package.
 """
 
 from __future__ import annotations
@@ -57,8 +57,8 @@ def _resolve_sqlite_url(url: str) -> str:
     it relative to the process's working directory.
 
     A relative SQLite URL like the default ``sqlite:///./pdm.db`` resolves
-    against whatever the *current* process considers its working directory
-    -- for a plain script that is usually the repo root, but a Jupyter
+    against whatever the *current* process considers its working directory:
+    for a plain script that is usually the repo root, but a Jupyter
     kernel defaults its working directory to the notebook's own folder.
     Running notebooks/03_api_demo.ipynb (which spawns the real API as a
     subprocess) surfaced this directly: the database silently ended up at
@@ -82,7 +82,7 @@ def load_config(path: str | Path | None = None) -> Config:
     with cfg_path.open(encoding="utf-8") as fh:
         raw = yaml.safe_load(fh)
 
-    # PDM_DATABASE_URL overrides configs/default.yaml's api.database_url --
+    # PDM_DATABASE_URL overrides configs/default.yaml's api.database_url;
     # used by docker/docker-compose.yml to point the containerized API at
     # Postgres instead of the SQLite default, without a separate config file.
     env_database_url = os.environ.get("PDM_DATABASE_URL")

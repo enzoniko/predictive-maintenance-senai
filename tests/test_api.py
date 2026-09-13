@@ -62,6 +62,21 @@ def _sample_window(config: Config, sensor_names: list[str], seed: int = 0) -> di
     return {name: rng.normal(0, 0.2, size=window_len).tolist() for name in sensor_names}
 
 
+def test_reference_falls_back_to_bundled_examples_without_a_feature_cache(api_client) -> None:
+    # serving/api.py::_load_cached_reference needs *something* to hand LIME
+    # as a background sample when the cached feature table isn't there,
+    # which is the API container's actual situation (it never ships the
+    # ~380 MB raw dataset or its derived cache); this is the fallback that
+    # covers that, built from the small bundled configs/sample_windows.json
+    # instead, and it must work with a real (not synthetic) window shape.
+    from pdm.serving.api import _build_reference_from_bundled_examples
+
+    _client, artifacts = api_client
+    reference = _build_reference_from_bundled_examples(artifacts.bundle)
+    assert list(reference.columns) == artifacts.bundle.feature_columns
+    assert len(reference) == 5  # one real example per class
+
+
 def test_health_reports_bundle_metadata(api_client) -> None:
     client, artifacts = api_client
     resp = client.get("/health")
@@ -131,6 +146,21 @@ def test_predictions_are_persisted_to_the_database(api_client, synthetic_config_
     assert rows[-1].predicted_class in artifacts.bundle.classes
 
 
+def test_recent_predictions_reflects_a_just_made_prediction(
+    api_client, synthetic_config_module: Config
+) -> None:
+    client, artifacts = api_client
+    window = _sample_window(synthetic_config_module, artifacts.bundle.sensor_names)
+    predict_resp = client.post("/predict", json={"sensors": window})
+    predicted_class = predict_resp.json()["predicted_class"]
+
+    resp = client.get("/predictions/recent?n=1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["predictions"]) == 1
+    assert body["predictions"][0]["predicted_class"] == predicted_class
+
+
 def test_explain_returns_top_features(api_client, synthetic_config_module: Config) -> None:
     client, artifacts = api_client
     window = _sample_window(synthetic_config_module, artifacts.bundle.sensor_names)
@@ -150,6 +180,25 @@ def test_audit_endpoint_runs_and_persists(api_client) -> None:
     body = resp.json()
     assert body["n_windows"] == 600
     assert set(body["recommended_sensors"]) <= {"Dados_1", "Dados_2", "Dados_3", "Dados_4", "Dados_5"}
+
+
+def test_audit_endpoint_returns_actionable_error_without_raw_data(
+    api_client, synthetic_config_module: Config
+) -> None:
+    # Reproduces this API's actual situation in the Docker image, which
+    # never ships the ~380 MB raw dataset: a missing Classes.npy must
+    # surface as a clear 503, not the bare 500 it did before this was
+    # caught by actually running the container end to end.
+    client, _artifacts = api_client
+    real_labels_path = synthetic_config_module.paths.labels_path
+    backup_path = real_labels_path.with_suffix(".npy.bak")
+    real_labels_path.rename(backup_path)
+    try:
+        resp = client.get("/audit")
+        assert resp.status_code == 503
+        assert "raw sensor data not found" in resp.json()["detail"]
+    finally:
+        backup_path.rename(real_labels_path)
 
 
 def test_drift_requires_minimum_production_samples(api_client, synthetic_config_module: Config) -> None:

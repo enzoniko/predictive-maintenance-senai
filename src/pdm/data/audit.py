@@ -113,7 +113,7 @@ def _check_ghost_columns(dataset: SensorDataset) -> dict[str, CheckResult]:
                 "non_nan_row_indices": non_nan_idx[:20].tolist(),
                 "non_nan_values": ghost[non_nan_idx][:20].tolist(),
                 "hypotheses": [
-                    "end-of-window delimiter -- rejected: not constant across rows",
+                    "end-of-window delimiter; rejected: not constant across rows",
                     "leftover label/index column misaligned during export",
                     "artifact of concatenating a (N, 201) DataFrame with a stray column",
                 ],
@@ -138,7 +138,7 @@ def _check_row_contiguity(dataset: SensorDataset) -> CheckResult:
             "rows look contiguous (continuous recording sliced into windows) "
             "-- group-aware splitting required"
             if contiguous
-            else "rows are independent/shuffled windows -- no evidence of a "
+            else "rows are independent/shuffled windows; no evidence of a "
             "continuous underlying recording"
         ),
         details={
@@ -167,8 +167,8 @@ def _check_simultaneity(dataset: SensorDataset) -> CheckResult:
         name="inter_sensor_simultaneity",
         verdict=(
             "cannot verify exact timestamps (none provided); row-wise RMS "
-            "envelopes co-vary across sensors, consistent with -- but not "
-            "proof of -- simultaneous acquisition"
+            "envelopes co-vary across sensors, consistent with; but not "
+            "proof of; simultaneous acquisition"
             if mean_corr > 0.4
             else "sensors do not visibly co-vary; the 'simultaneous acquisition' "
             "claim could not be corroborated"
@@ -182,7 +182,7 @@ def _class_balance(dataset: SensorDataset) -> tuple[dict[str, int], str]:
     balance = {c: int(n) for c, n in zip(classes, counts)}
     spread = (max(counts) - min(counts)) / max(counts)
     verdict = (
-        "perfectly balanced across classes -- unlikely to occur naturally on "
+        "perfectly balanced across classes; unlikely to occur naturally on "
         "a factory floor; treat as a curated/synthetic sample and re-evaluate "
         "under a realistic class prior before deployment (see "
         "evaluation/imbalance.py)"
@@ -215,7 +215,7 @@ def _permutation_control_test(
     specific (possibly degenerate) channel.
 
     Subsamples to ``max_samples`` rows (consistently for the observed score
-    and every null draw) purely for runtime -- 20k+ rows would make the
+    and every null draw) purely for runtime; 20k+ rows would make the
     k-NN-based MI estimator the bottleneck of the whole audit for no gain in
     the statistic's reliability.
 
@@ -289,7 +289,7 @@ def _audit_sensor(
         with np.errstate(invalid="ignore", divide="ignore"):
             _, kw_p = stats.kruskal(*groups)
         # A (near-)constant channel ties every observation, and the H-statistic's
-        # tie correction divides by zero -- kruskal then returns nan rather
+        # tie correction divides by zero; kruskal then returns nan rather
         # than raising. Treat that degenerate case as "no evidence".
         if np.isnan(kw_p):
             kw_p = 1.0
@@ -301,13 +301,13 @@ def _audit_sensor(
 
     carries_info = (kw_p < alpha) and (perm_p < alpha) and not is_stuck
     if is_stuck:
-        verdict = "stuck at (near-)constant value -- no information, likely a dead/miswired sensor"
+        verdict = "stuck at (near-)constant value; no information, likely a dead/miswired sensor"
     elif is_white_noise and not carries_info:
-        verdict = "statistically indistinguishable from white noise across classes -- excluded"
+        verdict = "statistically indistinguishable from white noise across classes; excluded"
     elif carries_info:
-        verdict = "carries class-discriminative information -- retained"
+        verdict = "carries class-discriminative information; retained"
     else:
-        verdict = "no significant class association detected at the tested resolution -- excluded"
+        verdict = "no significant class association detected at the tested resolution; excluded"
 
     return SensorAudit(
         sensor=name,

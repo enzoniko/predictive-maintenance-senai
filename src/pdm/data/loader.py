@@ -4,7 +4,7 @@ Design notes (see docs/07_perguntas_ao_cliente.md for the open questions
 these choices raise with the client):
 
 * ``Classes.npy`` is a pickled ``dtype=object`` array of Python strings. Every
-  ``np.load`` call on it therefore needs ``allow_pickle=True`` -- a supply
+  ``np.load`` call on it therefore needs ``allow_pickle=True``; a supply
   -chain risk in production (a swapped file could execute arbitrary code on
   unpickling). ``load_labels`` converts it to a fixed-width ``<U`` string
   array immediately and callers never touch the pickled form again; the
@@ -13,7 +13,7 @@ these choices raise with the client):
   instead of the expected 200 (10 kHz x 20 ms). Column 200 (0-indexed) is
   NaN in every row except exactly one, and that one non-NaN value has no
   consistent relationship to the row's class. It is dropped, not treated as
-  a feature -- see ``_split_ghost_column`` for the validation that guards
+  a feature; see ``_split_ghost_column`` for the validation that guards
   this assumption instead of silently trusting it.
 """
 
@@ -90,7 +90,7 @@ def _split_ghost_column(
         raise SchemaError(
             f"{name}: column {expected_len} was expected to be a near-empty "
             f"artifact (<= {GHOST_COLUMN_MAX_NON_NAN_FRACTION:.0%} non-NaN) but "
-            f"{non_nan_fraction:.1%} of rows are populated -- this may be real "
+            f"{non_nan_fraction:.1%} of rows are populated; this may be real "
             "data, refusing to drop it silently."
         )
     return matrix[:, :expected_len], ghost

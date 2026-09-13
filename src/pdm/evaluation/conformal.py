@@ -3,14 +3,14 @@ coverage guarantee, instead of a single point prediction the model always
 commits to.
 
 This is the concrete answer to "how does the system know when it does not
-know?" -- for a maintenance team, a prediction set of size 1 with high
+know?"; for a maintenance team, a prediction set of size 1 with high
 confidence is actionable on its own, a set of size 3-4 says "narrow it down
 with a manual inspection", and (with LAC) an *empty* set says "this window
 does not look like anything the model has been trained on, escalate it".
 
 Two scoring rules are implemented:
 
-* **LAC** (least ambiguous classifier): nonconformity = 1 - P(true class).
+* **LAC** (least ambiguous classifier): nonconformity = 1; P(true class).
   Simple, can produce small or empty sets, but set sizes vary more sharply
   with how "peaked" a prediction is.
 * **APS** (adaptive prediction sets, Romano et al. 2020): nonconformity =
@@ -19,15 +19,15 @@ Two scoring rules are implemented:
   which is why it is the default in configs/default.yaml.
 
 APS is implemented in its **randomized** form. The plain (deterministic)
-version -- always fully including the class at which the cumulative sum
-crosses the threshold -- is a well-documented source of systematic
+version; always fully including the class at which the cumulative sum
+crosses the threshold; is a well-documented source of systematic
 over-coverage (see Romano et al. 2020, Angelopoulos & Bates's conformal
 tutorial): with few classes in particular, that boundary class alone can
 carry a large slice of probability mass, so "always include it" can inflate
 empirical coverage well past the target instead of tracking it. The
 randomized version includes that boundary class only with probability
 proportional to how much of the threshold its own mass would fill, using a
-per-sample uniform draw -- this is what actually delivers the target
+per-sample uniform draw; this is what actually delivers the target
 coverage rather than a loose upper bound on it. Reproducibility is
 controlled by ``random_state``, threaded through both calibration and
 prediction.

@@ -8,6 +8,7 @@ from pdm.evaluation.explain import (
     SHAP_AVAILABLE,
     _aggregate_shap_values,
     lime_explain_instance,
+    local_shap_values_for_class,
     permutation_importance_report,
     shap_global_importance,
 )
@@ -63,10 +64,9 @@ def test_aggregate_shap_values_handles_list_of_per_class_arrays() -> None:
 
 def test_aggregate_shap_values_handles_3d_array() -> None:
     # Newer SHAP API for multi-class TreeExplainer: a single
-    # (n_samples, n_features, n_classes) array -- this shape is exactly
-    # what broke shap_global_importance on the Linux x86-64 test server
-    # (SHAP is unavailable on the Windows ARM64 dev machine, so this path
-    # was never exercised there; see docs/03_arquitetura.md, section 3.6).
+    # (n_samples, n_features, n_classes) array; this shape is exactly
+    # what broke shap_global_importance during the real explainability run
+    # (see docs/03_arquitetura.md, section 3.6).
     rng = np.random.default_rng(0)
     values = rng.normal(size=(50, 4, 3))
     result = _aggregate_shap_values(values)
@@ -81,3 +81,34 @@ def test_aggregate_shap_values_handles_2d_array() -> None:
     result = _aggregate_shap_values(values)
     assert result.shape == (4,)
     assert np.allclose(result, np.abs(values).mean(axis=0))
+
+
+def test_local_shap_values_for_class_handles_list_of_per_class_arrays() -> None:
+    rng = np.random.default_rng(0)
+    per_class = [rng.normal(size=(1, 4)) for _ in range(3)]
+    result = local_shap_values_for_class(per_class, class_idx=1)
+    assert result.shape == (4,)
+    assert np.allclose(result, per_class[1][0])
+
+
+def test_local_shap_values_for_class_handles_3d_array() -> None:
+    # This is exactly the shape a single-row TreeExplainer call returns on
+    # current SHAP: (n_samples=1, n_features, n_classes). Code that only
+    # handled the list-of-2D-arrays shape (e.g. `shap_values[0]`) silently
+    # sliced off the first feature instead of indexing the one instance,
+    # returning a per-class vector instead of a per-feature one -- this is
+    # the bug that broke POST /explain's SHAP branch in production, caught
+    # only once SHAP was genuinely installed and exercised end to end.
+    rng = np.random.default_rng(0)
+    values = rng.normal(size=(1, 4, 3))
+    result = local_shap_values_for_class(values, class_idx=2)
+    assert result.shape == (4,)
+    assert np.allclose(result, values[0, :, 2])
+
+
+def test_local_shap_values_for_class_handles_2d_array() -> None:
+    rng = np.random.default_rng(0)
+    values = rng.normal(size=(1, 4))
+    result = local_shap_values_for_class(values, class_idx=0)
+    assert result.shape == (4,)
+    assert np.allclose(result, values[0])

@@ -2,8 +2,8 @@
 
 Tests never touch the real ~400 MB Dados_*.npy files (those are gitignored
 and only present locally after scripts/download_data.py runs). Instead this
-builds a tiny synthetic dataset with the same shape quirks -- a 201st ghost
-column on the "real" sensors, one stuck sensor, one white-noise sensor -- so
+builds a tiny synthetic dataset with the same shape quirks; a 201st ghost
+column on the "real" sensors, one stuck sensor, one white-noise sensor; so
 the loader and audit logic are exercised end to end quickly and
 deterministically.
 """
@@ -86,7 +86,7 @@ def synthetic_config(synthetic_raw_dir: Path, tmp_path: Path) -> Config:
         sensor_screening={
             "min_unique_ratio": 0.05,
             # Looser than production (0.01) because this fixture uses far
-            # fewer permutation repeats for speed -- see the note below.
+            # fewer permutation repeats for speed; see the note below.
             "alpha": 0.05,
             "whiteness_autocorr_lag1_max": 0.15,
             # Fewer repeats than production for fast, deterministic tests;

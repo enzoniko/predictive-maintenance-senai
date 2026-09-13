@@ -2,7 +2,7 @@
 
 Loads a ``ModelBundle`` once at startup and serves predictions, an
 on-demand data-quality audit, drift scoring against a reference sample, and
-an explanation endpoint -- backed by ``serving/db.py`` so every call this
+an explanation endpoint; backed by ``serving/db.py`` so every call this
 service makes is durably recorded (see that module's docstring for why the
 database's scope stops there rather than duplicating the client's own raw
 sensor data).
@@ -31,6 +31,8 @@ from pdm.serving.schemas import (
     PredictBatchRequest,
     PredictRequest,
     PredictResponse,
+    RecentPredictionsResponse,
+    RecentPredictionSummary,
 )
 
 state: dict[str, Any] = {}
@@ -42,7 +44,7 @@ async def lifespan(app: FastAPI):
     bundle_path = cfg.paths.models_dir / BUNDLE_FILENAME
     if not bundle_path.exists():
         raise RuntimeError(
-            f"No model bundle at {bundle_path} -- run `python -m pdm.cli train` first."
+            f"No model bundle at {bundle_path}; run `python -m pdm.cli train` first."
         )
     state["config"] = cfg
     state["bundle"] = ModelBundle.load(bundle_path)
@@ -56,16 +58,45 @@ async def lifespan(app: FastAPI):
 def _load_cached_reference(cfg, bundle: ModelBundle):
     """Best-effort initial drift reference from the cached feature table
     (``python -m pdm.cli features``), restricted to this bundle's feature
-    columns. Returns None (drift scoring then requires an explicit
-    ``POST /drift/reference`` call) if no cache exists or its columns don't
-    match -- this is a convenience default, not a hard dependency."""
+    columns. Falls back to a tiny reference built from the bundled
+    real-example windows (``configs/sample_windows.json``, the same asset
+    the dashboard demos with) when no cache exists, e.g. in the API
+    container, which never has the ~380 MB raw dataset or its derived
+    feature cache; that keeps ``POST /explain``'s LIME fallback usable
+    out of the box, at the cost of only 5 rows rather than the full
+    training set (fine for LIME's local perturbation background, not
+    enough for ``GET /drift``, which still requires an explicit
+    ``POST /drift/reference/reload`` once real traffic accumulates)."""
     from pdm.data.io import load_feature_table
 
     try:
         table = load_feature_table(cfg.paths.processed_dir)
         return table[bundle.feature_columns]
     except (FileNotFoundError, KeyError):
+        pass
+
+    try:
+        return _build_reference_from_bundled_examples(bundle)
+    except (FileNotFoundError, KeyError):
         return None
+
+
+def _build_reference_from_bundled_examples(bundle: ModelBundle) -> pd.DataFrame:
+    import json
+    from pathlib import Path
+
+    from pdm.config import REPO_ROOT
+
+    samples_path = Path(REPO_ROOT) / "configs" / "sample_windows.json"
+    with open(samples_path, encoding="utf-8") as f:
+        payload = json.load(f)
+
+    rows = []
+    for example in payload["examples"].values():
+        raw = {name: np.asarray(values, dtype=np.float64).reshape(1, -1) for name, values in example.items()}
+        table, _ = build_features_from_raw(raw, bundle.cleaners, bundle.sample_rate_hz, include_wavelet=True)
+        rows.append(table.iloc[0])
+    return pd.DataFrame(rows)[bundle.feature_columns].reset_index(drop=True)
 
 
 app = FastAPI(title="Predictive Maintenance API", version="0.1.0", lifespan=lifespan)
@@ -128,12 +159,28 @@ def health() -> HealthResponse:
 def audit() -> AuditSummaryResponse:
     """Re-runs the data-quality audit against the currently configured raw
     data directory and persists it. Expensive (tens of seconds on the full
-    dataset) -- intended for periodic/manual checks, not per-prediction use."""
+    dataset); intended for periodic/manual checks, not per-prediction use.
+
+    Needs the raw dataset on disk, which this API's own Docker image never
+    ships (it is the client's ~380 MB data, gitignored here); in the
+    contracted project this reads from the client's database through the
+    adapter described in docs/02_engenharia_requisitos.md section 2.4
+    instead. Raises a clear, actionable error rather than a bare 500 when
+    that data is not where this environment expects it.
+    """
     from pdm.data.audit import run_audit
     from pdm.data.loader import load_sensor_dataset
 
     cfg = state["config"]
-    dataset = load_sensor_dataset(cfg)
+    try:
+        dataset = load_sensor_dataset(cfg)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            503,
+            f"raw sensor data not found ({exc}); this environment has no local dataset to audit; "
+            "run `python scripts/download_data.py` first, or point this deployment at the "
+            "client's database adapter instead (see docs/02_engenharia_requisitos.md, section 2.4)",
+        ) from exc
     report = run_audit(dataset, cfg)
 
     with state["session_factory"]() as session:
@@ -155,7 +202,7 @@ def _predict_and_build_record(sensors: dict[str, list[float]]) -> tuple[PredictR
     warnings = []
     if is_silent:
         warnings.append(
-            "window flagged as near-silent by at least one sensor -- treat this "
+            "window flagged as near-silent by at least one sensor; treat this "
             "prediction with caution (see docs/07_perguntas_ao_cliente.md)"
         )
     if len(conformal_set) > 1:
@@ -195,9 +242,9 @@ def predict(request: PredictRequest) -> PredictResponse:
 def predict_batch(request: PredictBatchRequest) -> list[PredictResponse]:
     """Scores every window and persists all of them in a single transaction.
 
-    Calling POST /predict in a loop from a client -- as notebooks/03's demo
-    originally did to generate a batch of production traffic for GET /drift
-    -- means one HTTP round trip *and* one fsync'd DB commit per window;
+    Calling POST /predict in a loop from a client, as notebooks/03's demo
+    originally did to generate a batch of production traffic for GET /drift,
+    means one HTTP round trip *and* one fsync'd DB commit per window;
     at a couple hundred windows that took over 10 minutes end to end and
     is what actually motivated this endpoint's batching to be real instead
     of just a thin loop over ``predict()``, which is what it was before.
@@ -224,27 +271,37 @@ def explain(request: PredictRequest) -> ExplainResponse:
         try:
             import shap
 
+            from pdm.evaluation.explain import local_shap_values_for_class
+
             explainer = shap.TreeExplainer(bundle.model)
             row = pd.DataFrame([feature_values], columns=bundle.feature_columns)
             shap_values = explainer.shap_values(row)
             class_idx = bundle.classes.index(predicted_class)
-            values = shap_values[class_idx][0] if isinstance(shap_values, list) else shap_values[0]
+            values = local_shap_values_for_class(shap_values, class_idx)
             order = np.argsort(-np.abs(values))[:10]
             top_features = [
                 {"feature": bundle.feature_columns[i], "shap_value": float(values[i])} for i in order
             ]
             return ExplainResponse(predicted_class=predicted_class, top_features=top_features, method="shap")
-        except Exception:  # pragma: no cover -- defensive fallback below covers this
-            pass
+        except Exception as exc:  # pragma: no cover; defensive fallback below covers this
+            # Logged (not silently swallowed) precisely because this branch
+            # already hid one real, previously-undiscovered bug in
+            # production: only ever exercised for real once SHAP was
+            # actually installed and a matching model bundle both loaded,
+            # by which point a silent `pass` here would have looked
+            # identical to "SHAP just isn't available."
+            import logging
 
-    # Fallback 2: LIME, a local (per-instance) explanation like SHAP -- and,
+            logging.getLogger(__name__).warning("SHAP explanation failed, falling back to LIME: %s", exc)
+
+    # Fallback 2: LIME, a local (per-instance) explanation like SHAP; and,
     # unlike the feature_importances_ fallback this replaced, one that
     # actually exists for every model here: HistGradientBoostingClassifier
     # (the model this bundle's own training run selected) has no
-    # feature_importances_ attribute at all, so on a platform without SHAP
-    # (this Windows ARM64 dev machine, see docs/03_arquitetura.md sec. 3.6)
-    # the old fallback always raised 503 -- caught by notebooks/03's demo
-    # run, not a hypothetical. LIME needs a background sample to perturb
+    # feature_importances_ attribute at all, so on an environment without
+    # SHAP (see docs/03_arquitetura.md sec. 3.6) the old fallback always
+    # raised 503; caught by notebooks/03's demo run, not a hypothetical.
+    # LIME needs a background sample to perturb
     # around; the cached drift reference (already loaded at startup) serves
     # that purpose without requiring the full training set at inference time.
     reference = state.get("drift_reference")
@@ -261,7 +318,7 @@ def explain(request: PredictRequest) -> ExplainResponse:
                 {"feature": f, "weight": float(w)} for f, w in lime_exp.as_list(label=label)
             ]
             return ExplainResponse(predicted_class=predicted_class, top_features=top_features, method="lime")
-        except Exception:  # pragma: no cover -- defensive fallback below covers this
+        except Exception:  # pragma: no cover; defensive fallback below covers this
             pass
 
     # Fallback 3: the model's own (global) feature_importances_, when present.
@@ -279,7 +336,7 @@ def explain(request: PredictRequest) -> ExplainResponse:
 
 # PSI (evaluation/drift.py) bins the reference into deciles by default;
 # with too few current-batch samples per bin, sampling noise alone produces
-# large PSI values and floods the report with false alarms -- observed
+# large PSI values and floods the report with false alarms; observed
 # directly running notebooks/03_api_demo.ipynb with ~40 samples drawn from
 # the *same* distribution as the reference (no real drift possible) and
 # still getting 143/176 features flagged. 200 keeps roughly 20+ samples per
@@ -291,7 +348,7 @@ MIN_PRODUCTION_SAMPLES_FOR_DRIFT = 200
 @app.post("/drift/reference/reload")
 def reload_drift_reference() -> dict:
     """Re-reads the cached feature table (``python -m pdm.cli features``) as
-    the drift reference -- call this after retraining against new data."""
+    the drift reference; call this after retraining against new data."""
     cfg = state["config"]
     reference = _load_cached_reference(cfg, _bundle())
     state["drift_reference"] = reference
@@ -303,7 +360,7 @@ def reload_drift_reference() -> dict:
 def drift(n: int = 200) -> DriftSummaryResponse:
     """Scores the ``n`` most recent real predictions' feature vectors
     (persisted by POST /predict) against the training reference. Requires
-    at least ``MIN_PRODUCTION_SAMPLES_FOR_DRIFT`` recorded predictions --
+    at least ``MIN_PRODUCTION_SAMPLES_FOR_DRIFT`` recorded predictions;
     early in a deployment's life, before that much traffic exists, this
     correctly refuses to report a drift score rather than comparing the
     reference against itself and calling that a measurement. A real
@@ -312,7 +369,7 @@ def drift(n: int = 200) -> DriftSummaryResponse:
     if reference is None:
         raise HTTPException(
             503,
-            "no drift reference available -- run `python -m pdm.cli features` "
+            "no drift reference available; run `python -m pdm.cli features` "
             "then POST /drift/reference/reload, or retrain",
         )
 
@@ -327,7 +384,7 @@ def drift(n: int = 200) -> DriftSummaryResponse:
         raise HTTPException(
             503,
             f"only {len(rows)} recorded predictions available, need at least "
-            f"{MIN_PRODUCTION_SAMPLES_FOR_DRIFT} to score drift meaningfully -- "
+            f"{MIN_PRODUCTION_SAMPLES_FOR_DRIFT} to score drift meaningfully; "
             "call POST /predict more (or lower n) before checking drift",
         )
 
@@ -350,4 +407,30 @@ def drift(n: int = 200) -> DriftSummaryResponse:
     top = report.to_dataframe().head(10).to_dict(orient="records")
     return DriftSummaryResponse(
         n_alarms=report.n_alarms, n_reference=report.n_reference, n_current=report.n_current, top_features=top
+    )
+
+
+@app.get("/predictions/recent", response_model=RecentPredictionsResponse)
+def recent_predictions(n: int = 20) -> RecentPredictionsResponse:
+    """The ``n`` most recent persisted predictions, newest first; backs the
+    dashboard's operational history view (a shop-floor operator watching
+    what the system has decided lately, not just the single window they
+    just tested)."""
+    with state["session_factory"]() as session:
+        rows = (
+            session.query(db.PredictionRecord)
+            .order_by(db.PredictionRecord.id.desc())
+            .limit(n)
+            .all()
+        )
+    return RecentPredictionsResponse(
+        predictions=[
+            RecentPredictionSummary(
+                created_at=r.created_at,
+                predicted_class=r.predicted_class,
+                conformal_set_size=len(r.conformal_set),
+                is_silent=r.is_silent,
+            )
+            for r in rows
+        ]
     )

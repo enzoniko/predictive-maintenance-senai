@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class PredictRequest(BaseModel):
     """One window per retained sensor, each exactly ``window_len`` raw
-    samples -- the same shape the model bundle was trained on
+    samples; the same shape the model bundle was trained on
     (``ModelBundle.sensor_names`` / ``window_len``, both echoed by
     ``GET /health``)."""
 
@@ -65,3 +65,14 @@ class DriftSummaryResponse(BaseModel):
     n_reference: int
     n_current: int
     top_features: list[dict]
+
+
+class RecentPredictionSummary(BaseModel):
+    created_at: datetime
+    predicted_class: str
+    conformal_set_size: int
+    is_silent: bool
+
+
+class RecentPredictionsResponse(BaseModel):
+    predictions: list[RecentPredictionSummary]

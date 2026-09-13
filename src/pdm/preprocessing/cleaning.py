@@ -1,12 +1,12 @@
 """Per-sensor cleaning: saturation removal, NaN handling, silent-window flags.
 
 The ghost column (see ``pdm.data.loader``) is already gone by the time data
-reaches this module -- what is handled here is everything the OBS note in
+reaches this module; what is handled here is everything the OBS note in
 the case statement warns about: "sensors ... podem captar sinais de ruidos e
 ate mesmo entrarem em falha." Concretely, for the retained sensors
 (Dados_1-3):
 
-* A handful of samples sit exactly at +/-5.0 in every file -- the ADC's
+* A handful of samples sit exactly at +/-5.0 in every file; the ADC's
   apparent full-scale range. These are clipped with a Hampel filter (a
   rolling median + MAD outlier detector) rather than dropped, so a window
   keeps its length and its non-saturated context.
@@ -16,7 +16,7 @@ ate mesmo entrarem em falha." Concretely, for the retained sensors
   if a future batch does contain gaps.
 * ~1-2% of windows are near-silent (very low RMS) in every real sensor and
   never occur in every class equally (see docs/07_perguntas_ao_cliente.md).
-  These are flagged, not discarded or imputed -- a model should be allowed
+  These are flagged, not discarded or imputed; a model should be allowed
   to abstain on them (see evaluation/conformal.py) rather than being forced
   to guess from what may be a dropout rather than a genuine idle state.
 
@@ -50,7 +50,7 @@ def _hampel_filter(row: np.ndarray, window: int, n_sigmas: float) -> np.ndarray:
 
 def _hampel_filter_matrix(matrix: np.ndarray, window: int, n_sigmas: float, threshold: float) -> np.ndarray:
     """Apply the Hampel filter only to rows that actually touch the saturation
-    threshold -- this is a small fraction of rows (see docs/07), so it keeps
+    threshold; this is a small fraction of rows (see docs/07), so it keeps
     the (otherwise O(n * window) per row) filter affordable at 50k rows."""
     out = matrix.copy()
     hits = np.where(np.any(np.abs(matrix) >= threshold, axis=1))[0]

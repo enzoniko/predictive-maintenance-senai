@@ -2,15 +2,15 @@
 and drift reports. SQLite by default (``configs/default.yaml``'s
 ``api.database_url``, zero setup) and Postgres in one line for the
 containerized deployment (``docker/docker-compose.yml`` sets
-``DATABASE_URL`` to a Postgres DSN) -- SQLAlchemy is the only thing that
+``DATABASE_URL`` to a Postgres DSN); SQLAlchemy is the only thing that
 needs to know which.
 
 This is also the answer to the case statement's "plus: bancos de dados"
 requirement in the way that made sense here: the client's own database
 (built by their software team, per the case statement) already owns the
 raw sensor data, so this project does not duplicate it. What this database
-owns is what only the AI system produces -- predictions, audits, drift
-reports -- so anything downstream (a shop-floor dashboard, a monthly
+owns is what only the AI system produces; predictions, audits, drift
+reports; so anything downstream (a shop-floor dashboard, a monthly
 report, an alert rule) has one durable place to read from regardless of
 which model version made a given call.
 """
@@ -43,7 +43,7 @@ class PredictionRecord(Base):
     # The engineered feature vector behind this prediction (feature name ->
     # value), so GET /drift can compare *real* recent production traffic
     # against the training reference instead of only a self-comparison
-    # smoke test -- see that endpoint in serving/api.py.
+    # smoke test; see that endpoint in serving/api.py.
     features: Mapped[dict] = mapped_column(JSON)
 
 
@@ -74,7 +74,7 @@ def get_engine(database_url: str):
     if ":memory:" in database_url:
         # SQLAlchemy's default SQLite pool opens a fresh connection per
         # checkout, and a fresh connection to ":memory:" is a brand new,
-        # empty database -- the tables init_db() just created would vanish
+        # empty database; the tables init_db() just created would vanish
         # on the very next query. StaticPool keeps a single connection alive
         # for the engine's lifetime, which is what makes an in-memory
         # database usable at all beyond a single connection.

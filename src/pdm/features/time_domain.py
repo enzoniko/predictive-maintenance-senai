@@ -2,7 +2,7 @@
 
 These are the standard condition-monitoring indicators used across the
 vibration- and current-analysis literature (see docs/08_revisao_literatura.md)
-because they are cheap, robust and -- unlike a raw spectrum -- directly
+because they are cheap, robust and; unlike a raw spectrum; directly
 interpretable to a maintenance engineer: "crest factor jumped" means
 something on the shop floor in a way that "feature_183" does not.
 """

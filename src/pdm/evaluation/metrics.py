@@ -2,7 +2,7 @@
 
 Calibration matters here specifically because conformal.py and the API's
 abstention logic (serving/api.py) both lean on predicted probabilities
-meaning what they claim to mean -- a model that is "confidently wrong" is
+meaning what they claim to mean; a model that is "confidently wrong" is
 worse for a maintenance team than one that says "I don't know".
 """
 

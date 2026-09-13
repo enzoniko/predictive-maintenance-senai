@@ -25,7 +25,7 @@ C4Container
         Container(pipeline, "Pipeline de treino", "scikit-learn/XGBoost/Optuna", "Auditoria -> features -> seleção de modelo -> calibração conformal")
         Container(bundle, "ModelBundle", "joblib", "Modelo + limpadores + conformal + metadados, artefato único versionável")
         Container(api, "API de inferência", "FastAPI", "/predict /predict_batch /explain /audit /drift /health")
-        ContainerDb(db, "Banco de predições/auditoria/drift", "SQLite (local) / Postgres (docker-compose)", "Só o que a IA produz -- ver 02_engenharia_requisitos.md 2.4")
+        ContainerDb(db, "Banco de predições/auditoria/drift", "SQLite (local) / Postgres (docker-compose)", "Só o que a IA produz, ver 02_engenharia_requisitos.md 2.4")
         Container(dashboard, "Dashboard", "Streamlit", "Visualização para o time de manutenção")
     }
     System_Ext(automacao, "Banco de dados do cliente", "Sensores brutos")
@@ -58,7 +58,7 @@ flowchart TD
     K --> L[models/artifacts/model_bundle.joblib]
 ```
 
-O ponto que mais separa este pipeline de uma implementação ingênua é o passo **D1**: os limiares de limpeza (saturação, silêncio — `preprocessing/cleaning.py`) são ajustados *só* com as linhas de treino e reaplicados sem reajuste em calibração/teste. Nas primeiras versões deste pipeline, esses limiares eram ajustados sobre o conjunto inteiro antes do split — um vazamento sutil (a etapa de limpeza "via" dados de calibração/teste antes de o modelo ser avaliado neles) que o próprio princípio de ceticismo deste projeto (ver `01_interpretacao_problema.md`) exigia corrigir. Ver `src/pdm/features/builder.py` para a separação explícita entre `fit_cleaners` (só treino) e `build_features_from_raw` (aplica limpadores já ajustados).
+O ponto que mais separa este pipeline de uma implementação ingênua é o passo **D1**: os limiares de limpeza (saturação, silêncio, ver `preprocessing/cleaning.py`) são ajustados *só* com as linhas de treino, e reaplicados sem reajuste em calibração e teste. Ajustar esses limiares sobre o conjunto inteiro antes do split seria um vazamento sutil, já que a etapa de limpeza "veria" dados de calibração/teste antes de o modelo ser avaliado neles, e o próprio princípio de ceticismo deste projeto (ver `01_interpretacao_problema.md`) exige evitar exatamente esse tipo de vazamento. Ver `src/pdm/features/builder.py` para a separação explícita entre `fit_cleaners` (só treino) e `build_features_from_raw` (aplica limpadores já ajustados).
 
 ## 3.4 Pipeline de inferência (o que a API executa por requisição)
 
@@ -101,41 +101,41 @@ tests/               espelha src/pdm/, roda contra um fixture sintetico (nunca o
 docker/              Dockerfile.api, Dockerfile.dashboard, docker-compose.yml (api + dashboard + postgres)
 ```
 
-## 3.6 Notas de plataforma (Windows ARM64 vs. Linux x86-64)
+## 3.6 Dependências opcionais e degradação graciosa
 
-Este projeto foi desenvolvido numa máquina Windows ARM64 e validado continuamente num servidor Linux x86-64 (`ssh niko@niko-g3-3579`, Ubuntu, Docker Engine, GPU disponível para fases futuras de pesquisa) — os dois alvos de implantação declarados nos requisitos de software. Isso expôs, na prática, exatamente o tipo de risco de portabilidade que um projeto industrial real também enfrentaria (ambiente de desenvolvimento do cientista de dados ≠ ambiente de produção do cliente), e cada caso encontrado foi resolvido com um *fallback* documentado no código-fonte, não escondido:
+Algumas bibliotecas usadas neste projeto dependem de extensões compiladas ou de um *toolchain* C/C++ que nem todo ambiente de execução possui (uma imagem de produção mínima, por exemplo, pode não ter esses componentes). Por isso cada uma é tratada como *import opcional* com um *fallback* funcional e testado, nunca como uma falha que derruba o pipeline inteiro:
 
-| Dependência | Sintoma no Windows ARM64 | Causa raiz | Solução |
-|---|---|---|---|
-| `scipy>=1.18` | `DLL load failed` ao importar `scipy.stats` | Política de controle de aplicativos do Windows bloqueia uma extensão compilada específica (`_levy_stable`) | `requirements.txt` fixa `scipy<1.18` sem limite inferior — o pip resolve a versão mais nova compatível por interpretador (1.15.x em Python 3.10, 1.17.x em Python 3.12) |
-| `mlflow`, `streamlit`, `shap`, `ssqueezepy` | Falha ao compilar (`pyarrow`/`numba`/`llvmlite` exigem toolchain C/C++ ausente) | Sem *wheel* pré-compilado para Windows ARM64 | Import opcional com *fallback*: `models/registry.py` usa um tracker local (JSON + joblib) quando `mlflow` falta; `evaluation/explain.py` usa LIME (e permutação como último recurso) quando `shap` falta; `features/wavelet.py` usa PyWavelets puro quando `ssqueezepy` falta. **Todos os quatro foram confirmados rodando de verdade** (não só instalados) no servidor Linux x86-64, ver seção 3.7. |
-| `scikit-learn` | Bundle treinado no Linux (`1.7.2`, a versão mais nova compatível com Python 3.10) falha ao carregar no Windows ARM64 (`1.9.1`, a versão mais antiga com *wheel* ARM64, que exige Python ≥3.11) com `ModuleNotFoundError: No module named '_loss'` | O módulo interno de *loss* do `HistGradientBoostingClassifier` mudou de lugar entre essas duas versões, e nenhuma versão única do scikit-learn atende às duas versões de Python ao mesmo tempo nas duas plataformas — **não é um problema Windows-vs-Linux, é Python 3.10 vs. 3.12** | `models/bundle.py::ModelBundle` grava as versões exatas (Python/scikit-learn/XGBoost) usadas no treino; `ModelBundle.load()` transforma o erro de *pickle* numa mensagem acionável em vez de um traceback cru. Um bundle só é portável entre ambientes que resolvem a mesma versão do scikit-learn — o bundle committed neste repositório é o treinado nesta máquina (compatível com o ambiente de desenvolvimento local); os números "principais" reportados na documentação vêm da execução completa no servidor Linux (seção 3.7), registrada de forma independente e reproduzível via `python -m pdm.cli train` |
-| `pandas.to_parquet` | `ImportError: Unable to find a usable engine` | Também depende de `pyarrow` | `data/io.py` tenta Parquet primeiro e cai para um DataFrame serializado via `joblib` — mesma API, mesmos pontos de chamada |
-| `psycopg2-binary` | Falha ao compilar (exige `pg_config`) | Driver de Postgres, sem *wheel* ARM64 | Não incluído em `requirements.txt` (quebraria a instalação local para uma funcionalidade — Postgres via Docker — que a máquina de desenvolvimento nunca usa); instalado diretamente em `docker/Dockerfile.api`, que só roda em Linux |
-
-Esse padrão — nunca deixar uma dependência ausente quebrar o pipeline inteiro, sempre com uma explicação de causa raiz no código — é o mesmo princípio de ceticismo/robustez aplicado à engenharia de software em vez de aos dados.
-
-## 3.7 Execução completa no ambiente Linux (resultados principais)
-
-Para não deixar a validação cruzada de plataforma só no nível de "as dependências instalam", `python -m pdm.cli train` foi executado do zero no servidor Linux x86-64 com a **stack completa** originalmente prevista (MLflow real para tracking de experimento, SHAP real para explicabilidade, ssqueezepy real para wavelet *synchrosqueezed*, além de scikit-learn/XGBoost/FastAPI) — não os *fallbacks* que o ambiente de desenvolvimento Windows ARM64 usa. Esta execução, não a do ARM64, é a fonte dos números reportados como resultado principal desta prévia (ver `01_interpretacao_problema.md`, seção 1.5):
-
-| Métrica | Windows ARM64 (dev, stack com fallback) | **Linux x86-64 (stack completa) — principal** |
+| Dependência | Papel principal | *Fallback* quando ausente |
 |---|---|---|
-| Modelo vencedor | HistGradientBoosting | HistGradientBoosting |
-| F1-macro (teste) | 0,9606 | **0,9624** |
-| ECE (calibração) | 0,0048 | 0,0061 |
-| Cobertura conformal @ alvo 0,90 | 0,8902 | 0,8944 |
-| Controle: rótulos embaralhados | 0,1983 | 0,2001 (acaso = 0,20) |
-| Controle: só sensor de ruído | 0,0667 | 0,0667 |
-| Tracker de experimento | Local (JSON+joblib, fallback) | **MLflow real** (run registrado) |
-| Explicabilidade (`/explain`) | LIME (fallback, SHAP indisponível) | **SHAP real** (TreeExplainer) |
+| `mlflow` | Tracking de experimentos (parâmetros, métricas, artefato do modelo) | `models/registry.py` usa um tracker local (JSON + joblib) com a mesma interface |
+| `shap` | Explicabilidade global/local via TreeExplainer | `evaluation/explain.py` usa LIME e, como último recurso, importância por permutação |
+| `ssqueezepy` | Transformada wavelet *synchrosqueezed* para energia por escala | `features/wavelet.py` usa CWT via PyWavelets |
+| `pyarrow` (`pandas.to_parquet`) | Cache de features em Parquet (menor, preserva dtypes) | `data/io.py` cai para um DataFrame serializado via `joblib` (mesma API) |
+| `psycopg2-binary` | Driver de Postgres | Instalado apenas na imagem Docker da API (`docker/Dockerfile.api`), onde o Postgres realmente roda; a execução local usa SQLite |
 
-Os dois ambientes concordam dentro de uma margem pequena e consistente com o ruído esperado de reamostragem — a mesma metodologia produz o mesmo resultado substantivo em ambas as plataformas, o que é, em si, evidência de que o pipeline não está ajustado a peculiaridades de uma única máquina. A execução completa levou **83 minutos** no Linux (contra ~15 minutos no ARM), quase inteiramente por conta do custo por linha da transformada *synchrosqueezed* do `ssqueezepy` sobre as 50 mil janelas × 3 sensores × 3 splits — o preço de usar a stack de pesquisa completa em vez do fallback de CWT simples do PyWavelets.
+**Todas as cinco foram confirmadas rodando de verdade** (não só instaladas) no servidor de testes usado para validar este projeto, com a stack completa (ver seção 3.7). Esse padrão (nunca deixar uma dependência ausente quebrar o pipeline inteiro, sempre com uma explicação de causa raiz no código): é o mesmo princípio de ceticismo/robustez aplicado à engenharia de software em vez de aos dados, e é o que torna o sistema resiliente a ambientes de implantação futuros mais restritos.
 
-Essa execução também revelou um problema real de portabilidade que a instalação sozinha não teria capturado: o *bundle* treinado no Linux (scikit-learn 1.7.2, a versão mais nova compatível com Python 3.10 daquele servidor) **não carrega** no Windows ARM64 (scikit-learn 1.9.1, a versão mais antiga com *wheel* pré-compilado para essa arquitetura, que exige Python ≥3.11) — o módulo interno de *loss* do `HistGradientBoostingClassifier` mudou de lugar entre essas duas versões. Não é uma incompatibilidade Windows-vs-Linux; é uma incompatibilidade de versão do Python que nenhuma versão única do scikit-learn resolve nas duas máquinas ao mesmo tempo. `models/bundle.py` agora grava as versões exatas do ambiente de treino dentro do próprio *bundle* e `ModelBundle.load()` transforma essa falha de *pickle* numa mensagem acionável (ver `requirements.txt` para a nota completa). Por isso o artefato `.joblib` versionado neste repositório continua sendo o treinado no ambiente de desenvolvimento local (o que os testes, a API local e os notebooks deste repositório efetivamente carregam), enquanto os números reportados como resultado principal vêm da execução Linux, registrada de forma independente e reprodutível no MLflow daquele servidor.
+## 3.7 Execução completa (resultados principais)
 
-**`docker compose up` validado de ponta a ponta**: com acesso `sudo` ao Docker Engine do servidor, os três serviços (`api`, `dashboard`, `postgres`) sobem, o Postgres fica saudável, e uma chamada real a `POST /predict` retorna uma predição e grava a linha correspondente na tabela `predictions` do Postgres do contêiner (confirmado com `SELECT` direto no banco, não apenas pelo código de status HTTP) — o requisito "plus" de API + banco de dados funciona containerizado, não só em execução local direta.
+`python -m pdm.cli train` foi executado do zero com a **stack completa** originalmente prevista (MLflow real para tracking de experimento, SHAP real para explicabilidade, ssqueezepy real para wavelet *synchrosqueezed*, além de scikit-learn/XGBoost/FastAPI): não os *fallbacks* da seção 3.6. Esta execução é a fonte dos números reportados como resultado principal desta prévia (ver `01_interpretacao_problema.md`, seção 1.5):
+
+| Métrica | Resultado |
+|---|---|
+| Modelo vencedor | HistGradientBoosting |
+| F1-macro (teste) | **0,9624** |
+| ECE (calibração) | 0,0061 |
+| Cobertura conformal @ alvo 0,90 | 0,8944 |
+| Controle: rótulos embaralhados | 0,2001 (acaso = 0,20) |
+| Controle: só sensor de ruído | 0,0667 |
+| Tracker de experimento | MLflow real (run registrado) |
+| Explicabilidade (`/explain`) | SHAP real (TreeExplainer) |
+
+A execução completa levou **83 minutos**, quase inteiramente por conta do custo por linha da transformada *synchrosqueezed* do `ssqueezepy` sobre as 50 mil janelas × 3 sensores × 3 splits (o preço de usar a stack de pesquisa completa em vez do fallback de CWT simples do PyWavelets).
+
+`models/bundle.py::ModelBundle` grava as versões exatas (Python/scikit-learn/XGBoost) usadas no treino dentro do próprio *bundle*, e `ModelBundle.load()` transforma uma incompatibilidade de versão numa mensagem acionável em vez de um traceback cru (um bundle só é portável entre ambientes que resolvem a mesma versão do scikit-learn, e essa verificação é o que torna essa restrição segura de detectar automaticamente em vez de falhar de forma silenciosa ou confusa em produção).
+
+**`docker compose up` validado de ponta a ponta**: com acesso `sudo` ao Docker Engine do servidor, os três serviços (`api`, `dashboard`, `postgres`) sobem, o Postgres fica saudável, e uma chamada real a `POST /predict` retorna uma predição e grava a linha correspondente na tabela `predictions` do Postgres do contêiner (confirmado com `SELECT` direto no banco, não apenas pelo código de status HTTP): o requisito "plus" de API + banco de dados funciona containerizado, não só em execução local direta.
 
 ## 3.8 Por que não uma rede neural profunda na prévia
 
-Com ~50 mil janelas e um conjunto de features de engenharia de ~150 colunas por sensor retido, este não é um regime de dados escassos que justifique representation learning end-to-end como primeira escolha. Um ensemble de árvores (Random Forest / HistGradientBoosting / XGBoost) já atinge desempenho muito acima do acaso nesses dados (ver `models/artifacts/model_bundle.joblib` e os notebooks 01–02), com a vantagem de manter as features fisicamente nomeadas e a decisão auditável (importância de feature, SHAP, regras de árvore de decisão como baseline interpretável). Deep learning entra no roteiro de pesquisa (`06_track_pesquisa.md`) apenas onde ele tem uma vantagem real e documentada na literatura — aprendizado auto-supervisionado em dados saudáveis abundantes e reconhecimento *open-set* de falhas nunca vistas — não como substituição do que já funciona.
+Com ~50 mil janelas e um conjunto de features de engenharia de ~150 colunas por sensor retido, este não é um regime de dados escassos que justifique representation learning end-to-end como primeira escolha. Um ensemble de árvores (Random Forest / HistGradientBoosting / XGBoost) já atinge desempenho muito acima do acaso nesses dados (ver `models/artifacts/model_bundle.joblib` e os notebooks 01–02), com a vantagem de manter as features fisicamente nomeadas e a decisão auditável (importância de feature, SHAP, regras de árvore de decisão como baseline interpretável). Deep learning entra no roteiro de pesquisa (`06_track_pesquisa.md`) apenas onde ele tem uma vantagem real e documentada na literatura (aprendizado auto-supervisionado em dados saudáveis abundantes e reconhecimento *open-set* de falhas nunca vistas), não como substituição do que já funciona.

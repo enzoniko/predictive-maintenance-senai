@@ -1,6 +1,6 @@
 # Per-sensor physical metadata. UNKNOWN for every field below because the
 # case package does not identify the transducer type, its sensitivity, or
-# the conditioning electronics' gain/offset -- see
+# the conditioning electronics' gain/offset; see
 # docs/07_perguntas_ao_cliente.md, question set "DADOS". Until the client
 # supplies these, the pipeline works entirely in raw volts and never claims
 # an engineering unit (g, mm/s, A, ...) it cannot justify.

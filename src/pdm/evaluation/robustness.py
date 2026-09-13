@@ -4,10 +4,10 @@ Two kinds of check live here:
 
 * **Degradation tests** answer "how much worse does the model get if a
   sensor drops out, a feature group is unavailable, or the signal is
-  noisier than training?" -- the honest answer a director needs before
+  noisier than training?"; the honest answer a director needs before
   betting a maintenance decision on this system, not just the best-case
   cross-validated score.
-* **Controls** answer "does the evaluation pipeline itself work?" -- a
+* **Controls** answer "does the evaluation pipeline itself work?"; a
   model that still scores well after its labels are shuffled would mean
   the whole measurement setup is leaking information, not that the model
   is unreasonably good.
@@ -46,7 +46,7 @@ def sensor_dropout_test(
 ) -> list[DegradationResult]:
     """Zero out every feature belonging to one sensor at a time (simulating
     that sensor going offline) and measure the resulting drop. The model is
-    *not* retrained -- this measures how much the already-deployed model
+    *not* retrained; this measures how much the already-deployed model
     leans on each channel, which is what matters operationally."""
     baseline = _score(model, X_test, y_test, classes)
     results = [DegradationResult("baseline (all sensors)", baseline, baseline)]
@@ -88,7 +88,7 @@ def gaussian_noise_injection_test(
 ) -> list[DegradationResult]:
     """Perturb every feature by Gaussian noise proportional to its own
     training-set std (``noise_level`` is that proportion). This is a proxy
-    for "the sensor got noisier" applied at the feature level -- a stricter
+    for "the sensor got noisier" applied at the feature level; a stricter
     test would inject noise into the raw waveform and re-run feature
     extraction, which notebooks/04 does for the retained scenario used in
     the final report; this fast version is what runs in CI/CD-style checks."""
@@ -123,7 +123,7 @@ def noise_sensor_control(
     n_splits: int = 5, seed: int = 42,
 ) -> float:
     """A model trained on nothing but the audit-excluded noise sensor's
-    features should also score at chance -- if it doesn't, the audit's
+    features should also score at chance; if it doesn't, the audit's
     exclusion decision (data/audit.py) needs revisiting, not this test."""
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
     scores = cross_val_score(

@@ -45,7 +45,7 @@ def main() -> None:
             f"F1 teste={test_f1:.4f}  folhas={tree.get_n_leaves():4d}  nós={tree.tree_.node_count:4d}"
         )
 
-    print(f"\n=== Árvore rasa (profundidade {READABLE_DEPTH}) -- regras completas ===")
+    print(f"\n=== Árvore rasa (profundidade {READABLE_DEPTH}): regras completas ===")
     tree = DecisionTreeClassifier(
         max_depth=READABLE_DEPTH, class_weight="balanced", random_state=cfg.random_seed
     )
