@@ -64,7 +64,14 @@ tests/            pytest suite (runs against a small synthetic fixture, not the 
 docker/           Container images for the API, dashboard and database
 scripts/          Data download, decision-tree interpretability analysis
 configs/          YAML configuration (paths, thresholds, seeds)
+deliverables/     Main case document and executive/technical slide decks
 ```
+
+## Final deliverables
+
+- [`Enzo Nicolás Spotorno Bieger.docx`](deliverables/Enzo%20Nicolás%20Spotorno%20Bieger.docx): main response, including the architecture, schedule, native WBS and risk tables, and the technical-preview results.
+- [`Apresentacao_Executiva.pptx`](deliverables/Apresentacao_Executiva.pptx): 10-slide version for the hiring panel and business stakeholder.
+- [`Apresentacao_Tecnica.pptx`](deliverables/Apresentacao_Tecnica.pptx): 22-slide technical defense of the data audit, modeling, uncertainty, robustness and architecture.
 
 ## Platform notes
 

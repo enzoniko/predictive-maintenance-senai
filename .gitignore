@@ -39,8 +39,8 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Deliverables assembled outside the repo
-deliverables/
+# Final case deliverables are versioned under deliverables/. Local intermediate
+# exports remain outside the repository in C:/FIESC/CASE/deliverables.
 
 # Local scripts that assemble the selection-process deliverables (docx,
 # slide decks, architecture PDF), not part of the pipeline or API.
@@ -48,6 +48,9 @@ scripts/fill_docx_template.py
 scripts/build_slides.py
 scripts/build_architecture_pdf.py
 scripts/generate_deliverable_assets.py
+
+# Optional recording scripts retained locally, outside the submitted solution.
+docs/videos/
 
 # Offline pip wheelhouse for Docker builds on flaky networks (see
 # docker/Dockerfile.api); regenerate locally, never commit the wheels.
